@@ -60,6 +60,26 @@
     <h2>Status</h2>
     <pre id="status"></pre>
 
+    <h2>Positions</h2>
+    <table border="1" cellpadding="6" cellspacing="0">
+      <thead>
+        <tr>
+          <th>ID</th><th>Symbol</th><th>Side</th><th>Entry</th><th>Current</th><th>Vol</th><th>Lev</th><th>TP</th><th>SL</th><th>PNL</th><th>ROI %</th>
+        </tr>
+      </thead>
+      <tbody id="positions"></tbody>
+    </table>
+
+    <h2>Order History</h2>
+    <table border="1" cellpadding="6" cellspacing="0">
+      <thead>
+        <tr>
+          <th>Time</th><th>Bot</th><th>Symbol</th><th>Side</th><th>Price</th><th>Vol</th><th>Lev</th><th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="history"></tbody>
+    </table>
+
     <script>
       let botId = null
       async function start() {
@@ -89,6 +109,39 @@
         const res = await fetch('/api/status')
         const data = await res.json()
         document.getElementById('status').textContent = JSON.stringify(data, null, 2)
+
+        const posRes = await fetch('/api/positions')
+        const posData = await posRes.json()
+        document.getElementById('positions').innerHTML = posData.map(p => `
+          <tr>
+            <td>${p.id}</td>
+            <td>${p.symbol}</td>
+            <td>${p.side ?? ''}</td>
+            <td>${p.entry ?? ''}</td>
+            <td>${p.current ?? ''}</td>
+            <td>${p.vol ?? ''}</td>
+            <td>${p.leverage ?? ''}</td>
+            <td>${p.tp ?? ''}</td>
+            <td>${p.sl ?? ''}</td>
+            <td>${p.pnl?.toFixed ? p.pnl.toFixed(6) : p.pnl}</td>
+            <td>${p.roi?.toFixed ? p.roi.toFixed(4) : p.roi}</td>
+          </tr>
+        `).join('')
+
+        const histRes = await fetch('/api/history')
+        const histData = await histRes.json()
+        document.getElementById('history').innerHTML = histData.map(h => `
+          <tr>
+            <td>${new Date(h.time).toLocaleString()}</td>
+            <td>${h.botId}</td>
+            <td>${h.symbol}</td>
+            <td>${h.side}</td>
+            <td>${h.price}</td>
+            <td>${h.vol}</td>
+            <td>${h.leverage}</td>
+            <td>${h.status}</td>
+          </tr>
+        `).join('')
       }
       document.getElementById('startBtn').addEventListener('click', start)
       document.getElementById('stopBtn').addEventListener('click', stop)

@@ -3,11 +3,17 @@ import crypto from 'crypto'
 import fetch from 'node-fetch'
 import path from 'path'
 import dotenv from 'dotenv'
+import { fileURLToPath } from 'url'
 
-dotenv.config({ path: path.join(process.cwd(), 'trading-bot', '.env') })
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+dotenv.config({ path: path.join(__dirname, '.env') })
 const app = express()
 app.use(express.json())
-app.use(express.static(path.join(process.cwd(), 'trading-bot', 'frontend')))
+app.use(express.static(path.join(__dirname, 'frontend')))
+app.get('/', (_req, res) => {
+  res.sendFile(path.join(__dirname, 'frontend', 'index.html'))
+})
 
 // In-memory bot state
 const bots = new Map()
@@ -97,6 +103,7 @@ async function strategyTick(bot) {
   const highs = rows.map(r => r.h)
   const lows = rows.map(r => r.l)
   const price = closes.at(-1)
+  bot.lastPrice = price
   const ema20 = ema(closes.slice(-60), 20)
   const ema50 = ema(closes.slice(-60), 50)
   const atr14 = atr(highs.slice(-60), lows.slice(-60), closes.slice(-60), 14)
@@ -113,6 +120,18 @@ async function strategyTick(bot) {
     bot.entry = price
     bot.tp = shouldLong ? price * (1 + tpPct) : price * (1 - tpPct)
     bot.sl = shouldLong ? price * (1 - slPct) : price * (1 + slPct)
+    bot.positionSide = shouldLong ? 'long' : 'short'
+    bot.history = bot.history || []
+    bot.history.push({
+      time: Date.now(),
+      symbol,
+      side: bot.positionSide,
+      price,
+      vol,
+      leverage,
+      status: res.status,
+      data: res.data
+    })
   }
 }
 
@@ -137,7 +156,10 @@ app.post('/api/start', async (req, res) => {
     lastOrder: null,
     entry: null,
     tp: null,
-    sl: null
+    sl: null,
+    positionSide: null,
+    lastPrice: null,
+    history: []
   }
   bots.set(id, bot)
   bot.timer = setInterval(() => strategyTick(bot).catch(() => {}), 10_000)
@@ -156,6 +178,37 @@ app.post('/api/stop', (req, res) => {
 
 app.get('/api/status', (req, res) => {
   const out = [...bots.values()].map(b => ({ id: b.id, symbol: b.symbol, lastOrder: b.lastOrder, entry: b.entry, tp: b.tp, sl: b.sl }))
+  res.json(out)
+})
+
+app.get('/api/positions', (req, res) => {
+  const out = [...bots.values()].map(b => {
+    const pnl = b.entry && b.lastPrice && b.vol
+      ? (b.positionSide === 'long'
+          ? (b.lastPrice - b.entry) * b.vol
+          : (b.entry - b.lastPrice) * b.vol)
+      : 0
+    const margin = b.entry && b.vol && b.leverage ? (b.entry * b.vol) / b.leverage : null
+    const roi = margin ? (pnl / margin) * 100 : null
+    return {
+      id: b.id,
+      symbol: b.symbol,
+      side: b.positionSide,
+      entry: b.entry,
+      current: b.lastPrice,
+      vol: b.vol,
+      leverage: b.leverage,
+      tp: b.tp,
+      sl: b.sl,
+      pnl,
+      roi
+    }
+  })
+  res.json(out)
+})
+
+app.get('/api/history', (req, res) => {
+  const out = [...bots.values()].flatMap(b => (b.history || []).map(h => ({ ...h, botId: b.id })))
   res.json(out)
 })
 
