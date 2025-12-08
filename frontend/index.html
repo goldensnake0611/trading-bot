@@ -12,80 +12,94 @@
       .row { margin-bottom:12px; }
       .card { border:1px solid #ddd; padding:12px; max-width: 640px; }
       pre { background:#f6f8fa; padding:12px; overflow:auto; }
+      #symbolPicker { display:flex; flex-wrap: wrap; gap:8px; margin: 8px 0; }
+      #symbolPicker button { margin:0; padding:6px 10px; }
     </style>
   </head>
   <body>
     <h1>MEXC Futures Trading Bot</h1>
     <div class="card">
-      <div class="row">
-        <label>API Key (leave empty to use server .env)</label>
-        <input id="apiKey" type="text" placeholder="Uses server .env if empty" />
+      <div style="display:flex; gap:12px; margin-bottom:12px;">
+        <button id="tabTrading">Trading</button>
+        <button id="tabHistory">History</button>
       </div>
-      <div class="row">
-        <label>API Secret (leave empty to use server .env)</label>
-        <input id="apiSecret" type="password" placeholder="Uses server .env if empty" />
+
+      <div id="viewTrading">
+        <div class="row">
+          <label>Symbol</label>
+          <input id="symbolSearch" type="text" placeholder="Search symbol (e.g., BTC_USDT)" />
+          <select id="symbolDropdown"></select>
+          <input id="symbol" type="hidden" value="BTC_USDT" />
+        </div>
+        <div class="row">
+          <label>Direction</label>
+          <select id="direction">
+            <option value="auto">Auto</option>
+            <option value="long">Long only</option>
+            <option value="short">Short only</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>Position Size (vol)</label>
+          <input id="vol" type="number" step="0.001" value="1" />
+        </div>
+        <div class="row">
+          <label>Leverage</label>
+          <input id="leverage" type="number" value="5" />
+        </div>
+        <div class="row">
+          <label>Take Profit (%)</label>
+          <input id="tpPct" type="number" step="0.001" value="0.01" />
+        </div>
+        <div class="row">
+          <label>Stop Loss (%)</label>
+          <input id="slPct" type="number" step="0.001" value="0.005" />
+        </div>
+        <button id="startBtn">Start</button>
+        <button id="stopBtn">Stop</button>
+
+        <h2>Status</h2>
+        <pre id="status"></pre>
+
+        <h2>Positions</h2>
+        <table border="1" cellpadding="6" cellspacing="0">
+          <thead>
+            <tr>
+              <th>ID</th><th>Symbol</th><th>Side</th><th>Entry</th><th>Current</th><th>Vol</th><th>Lev</th><th>TP</th><th>SL</th><th>PNL</th><th>ROI %</th>
+            </tr>
+          </thead>
+          <tbody id="positions"></tbody>
+        </table>
       </div>
-      <div class="row">
-        <label>Symbol</label>
-        <input id="symbol" type="text" value="BTC_USDT" />
+
+      <div id="viewHistory" style="display:none;">
+        <h2>Position History</h2>
+        <table border="1" cellpadding="6" cellspacing="0">
+          <thead>
+            <tr>
+              <th>Futures</th><th>Open Time</th><th>Close Time</th><th>Margin Mode</th><th>Avg Entry Price</th><th>Avg Close Price</th><th>Liquidation Price</th><th>Direction</th><th>Closing Quantity</th><th>Realised PNL</th><th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="positionsHistory"></tbody>
+        </table>
+
+        <h2>Order History</h2>
+        <table border="1" cellpadding="6" cellspacing="0">
+          <thead>
+            <tr>
+              <th>Time</th><th>Bot</th><th>Symbol</th><th>Side</th><th>Price</th><th>Vol</th><th>Lev</th><th>Status</th><th>Event</th><th>PNL</th><th>ROI %</th>
+            </tr>
+          </thead>
+          <tbody id="history"></tbody>
+        </table>
       </div>
-      <div class="row">
-        <label>Direction</label>
-        <select id="direction">
-          <option value="auto">Auto</option>
-          <option value="long">Long only</option>
-          <option value="short">Short only</option>
-        </select>
-      </div>
-      <div class="row">
-        <label>Position Size (vol)</label>
-        <input id="vol" type="number" step="0.001" value="1" />
-      </div>
-      <div class="row">
-        <label>Leverage</label>
-        <input id="leverage" type="number" value="5" />
-      </div>
-      <div class="row">
-        <label>Take Profit (%)</label>
-        <input id="tpPct" type="number" step="0.001" value="0.01" />
-      </div>
-      <div class="row">
-        <label>Stop Loss (%)</label>
-        <input id="slPct" type="number" step="0.001" value="0.005" />
-      </div>
-      <button id="startBtn">Start</button>
-      <button id="stopBtn">Stop</button>
     </div>
-
-    <h2>Status</h2>
-    <pre id="status"></pre>
-
-    <h2>Positions</h2>
-    <table border="1" cellpadding="6" cellspacing="0">
-      <thead>
-        <tr>
-          <th>ID</th><th>Symbol</th><th>Side</th><th>Entry</th><th>Current</th><th>Vol</th><th>Lev</th><th>TP</th><th>SL</th><th>PNL</th><th>ROI %</th>
-        </tr>
-      </thead>
-      <tbody id="positions"></tbody>
-    </table>
-
-    <h2>Order History</h2>
-    <table border="1" cellpadding="6" cellspacing="0">
-      <thead>
-        <tr>
-          <th>Time</th><th>Bot</th><th>Symbol</th><th>Side</th><th>Price</th><th>Vol</th><th>Lev</th><th>Status</th>
-        </tr>
-      </thead>
-      <tbody id="history"></tbody>
-    </table>
 
     <script>
       let botId = null
+      let activeTab = 'trading'
       async function start() {
         const payload = {
-          apiKey: document.getElementById('apiKey').value.trim(),
-          apiSecret: document.getElementById('apiSecret').value.trim(),
           symbol: document.getElementById('symbol').value.trim(),
           direction: document.getElementById('direction').value,
           vol: Number(document.getElementById('vol').value),
@@ -96,16 +110,16 @@
         const res = await fetch('/api/start', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) })
         const data = await res.json()
         botId = data.id
-        refresh()
+        refreshTrading()
       }
       async function stop() {
         if (!botId) return
         const res = await fetch('/api/stop', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id: botId }) })
         await res.json()
         botId = null
-        refresh()
+        refreshTrading()
       }
-      async function refresh() {
+      async function refreshTrading() {
         const res = await fetch('/api/status')
         const data = await res.json()
         document.getElementById('status').textContent = JSON.stringify(data, null, 2)
@@ -128,8 +142,11 @@
           </tr>
         `).join('')
 
+      }
+      async function refreshHistory() {
         const histRes = await fetch('/api/history')
-        const histData = await histRes.json()
+        let histData = await histRes.json()
+        histData = histData.sort((a,b) => b.time - a.time)
         document.getElementById('history').innerHTML = histData.map(h => `
           <tr>
             <td>${new Date(h.time).toLocaleString()}</td>
@@ -140,13 +157,76 @@
             <td>${h.vol}</td>
             <td>${h.leverage}</td>
             <td>${h.status}</td>
+            <td>${h.event}</td>
+            <td>${h.pnl ?? ''}</td>
+            <td>${h.roi ?? ''}</td>
+          </tr>
+        `).join('')
+
+        const posHistRes = await fetch('/api/positions_history')
+        const posHistData = await posHistRes.json()
+        document.getElementById('positionsHistory').innerHTML = posHistData.map(p => `
+          <tr>
+            <td>${p.symbol} Perpetual</td>
+            <td>${p.openTime ? new Date(p.openTime).toLocaleString() : ''}</td>
+            <td>${p.closeTime ? new Date(p.closeTime).toLocaleString() : ''}</td>
+            <td>${p.marginMode}</td>
+            <td>${p.entryPrice ?? ''}</td>
+            <td>${p.closePrice ?? ''}</td>
+            <td>${p.liquidationPrice ?? '--'}</td>
+            <td>${p.direction}</td>
+            <td>${p.closingQuantity ?? ''} USDT</td>
+            <td>${p.realizedPnl ?? ''} USDT ${p.realizedRoi ? `(${p.realizedRoi.toFixed ? p.realizedRoi.toFixed(2) : p.realizedRoi}%)` : ''}</td>
+            <td>${p.status}</td>
           </tr>
         `).join('')
       }
+      function showTrading() {
+        document.getElementById('viewTrading').style.display = 'block'
+        document.getElementById('viewHistory').style.display = 'none'
+        activeTab = 'trading'
+        refreshTrading()
+      }
+      function showHistory() {
+        document.getElementById('viewTrading').style.display = 'none'
+        document.getElementById('viewHistory').style.display = 'block'
+        activeTab = 'history'
+        refreshHistory()
+      }
+      document.getElementById('tabTrading').addEventListener('click', showTrading)
+      document.getElementById('tabHistory').addEventListener('click', showHistory)
       document.getElementById('startBtn').addEventListener('click', start)
       document.getElementById('stopBtn').addEventListener('click', stop)
-      setInterval(refresh, 5000)
-      refresh()
+
+      let contracts = []
+      async function loadContracts() {
+        const res = await fetch('/api/contracts')
+        contracts = await res.json()
+        renderContracts(contracts)
+      }
+      function renderContracts(list) {
+        const dd = document.getElementById('symbolDropdown')
+        dd.innerHTML = list.map(c => '<option value="' + c.symbol + '">' + (c.displayNameEn || c.symbol) + '</option>').join('')
+        if (list.length) {
+          document.getElementById('symbol').value = list[0].symbol
+          dd.value = list[0].symbol
+        }
+      }
+      document.getElementById('symbolDropdown').addEventListener('change', (e) => {
+        document.getElementById('symbol').value = e.target.value
+      })
+      document.getElementById('symbolSearch').addEventListener('input', (e) => {
+        const q = e.target.value.trim().toLowerCase()
+        const filtered = contracts.filter(c => (c.symbol || '').toLowerCase().includes(q) || (c.displayNameEn || '').toLowerCase().includes(q))
+        renderContracts(filtered.length ? filtered : contracts)
+      })
+
+      setInterval(() => {
+        if (activeTab === 'trading') refreshTrading()
+        else refreshHistory()
+      }, 5000)
+      loadContracts().then(() => refreshTrading())
     </script>
   </body>
 </html>
+      
