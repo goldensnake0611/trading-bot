@@ -128,8 +128,6 @@ async function strategyTick(bot) {
    
   const kl = await fetchKlines(symbol, 'Min1')
 
-  console.log("kl>>>>>>>>>>>>", kl)
-  
   const rows = (Array.isArray(kl?.data) ? kl.data : []).map(r => ({
     t: r.t || r.time || 0,
     o: Number(r.o ?? r.open ?? 0),
