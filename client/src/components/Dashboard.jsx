@@ -10,6 +10,9 @@ export default function Dashboard() {
   const [dailyPnl, setDailyPnl] = useState(0)
   const [status, setStatus] = useState([])
   const [positions, setPositions] = useState([])
+  const [selectedPositionIds, setSelectedPositionIds] = useState(new Set())
+  const [selectedHistoryIndices, setSelectedHistoryIndices] = useState(new Set())
+  const [selectedOrderIndices, setSelectedOrderIndices] = useState(new Set())
   const [history, setHistory] = useState([])
   const [posHistory, setPosHistory] = useState([])
   const [strategiesList, setStrategiesList] = useState([])
@@ -146,6 +149,67 @@ export default function Dashboard() {
   // Let's improve: The "Stop Bot" button will stop the bot for the *selected symbol* if it exists.
   const activeBot = status.find(b => b.symbol === symbol)
 
+  function handleRowClick(e, id) {
+    if (e.ctrlKey || e.metaKey) {
+      // Toggle all
+      if (selectedPositionIds.size === positions.length) {
+        setSelectedPositionIds(new Set())
+      } else {
+        setSelectedPositionIds(new Set(positions.map(p => p.id)))
+      }
+    } else {
+      // Toggle single
+      const newSet = new Set(selectedPositionIds)
+      if (newSet.has(id)) {
+        newSet.delete(id)
+      } else {
+        newSet.clear() // Clear others if simple click? 
+        // Requirement says "click the row, that row will be high-light"
+        // Usually single click selects ONLY that row.
+        newSet.add(id)
+      }
+      setSelectedPositionIds(newSet)
+    }
+  }
+
+  function handleHistoryRowClick(e, index) {
+    if (e.ctrlKey || e.metaKey) {
+      if (selectedHistoryIndices.size === posHistory.length) {
+        setSelectedHistoryIndices(new Set())
+      } else {
+        setSelectedHistoryIndices(new Set(posHistory.map((_, i) => i)))
+      }
+    } else {
+      const newSet = new Set(selectedHistoryIndices)
+      if (newSet.has(index)) {
+        newSet.delete(index)
+      } else {
+        newSet.clear()
+        newSet.add(index)
+      }
+      setSelectedHistoryIndices(newSet)
+    }
+  }
+
+  function handleOrderRowClick(e, index) {
+    if (e.ctrlKey || e.metaKey) {
+      if (selectedOrderIndices.size === history.length) {
+        setSelectedOrderIndices(new Set())
+      } else {
+        setSelectedOrderIndices(new Set(history.map((_, i) => i)))
+      }
+    } else {
+      const newSet = new Set(selectedOrderIndices)
+      if (newSet.has(index)) {
+        newSet.delete(index)
+      } else {
+        newSet.clear()
+        newSet.add(index)
+      }
+      setSelectedOrderIndices(newSet)
+    }
+  }
+
   return (
     <div className="container">
       <div className="card">
@@ -263,15 +327,22 @@ export default function Dashboard() {
               <table>
                 <thead>
                   <tr>
-                    <th>ID</th><th>Symbol</th><th>Side</th><th>Entry</th><th>Current</th><th>Vol</th><th>TP</th><th>SL</th><th>PNL</th><th>ROI %</th><th>Action</th>
+                    <th>ID</th><th>Symbol</th><th>Strategy</th><th>Entry</th><th>Current</th><th>Vol</th><th>TP</th><th>SL</th><th>PNL</th><th>ROI %</th><th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {positions.map(p => (
-                    <tr key={p.id}>
+                    <tr 
+                      key={p.id} 
+                      onClick={(e) => handleRowClick(e, p.id)}
+                      style={{ 
+                        cursor: 'pointer',
+                        backgroundColor: selectedPositionIds.has(p.id) ? 'rgba(255, 255, 255, 0.1)' : 'transparent' 
+                      }}
+                    >
                       <td>{p.id}</td>
                       <td>{p.symbol}</td>
-                      <td>{p.side}</td>
+                      <td>{p.strategy}</td>
                       <td>{p.entry}</td>
                       <td>{p.current}</td>
                       <td>{p.vol}</td>
@@ -310,13 +381,21 @@ export default function Dashboard() {
               <table>
                 <thead>
                   <tr>
-                    <th>Spot</th><th>Open Time</th><th>Close Time</th><th>Avg Entry Price</th><th>Avg Close Price</th><th>Direction</th><th>Closing Quantity</th><th>Realised PNL</th><th>Status</th>
+                    <th>Spot</th><th>Strategy</th><th>Open Time</th><th>Close Time</th><th>Avg Entry Price</th><th>Avg Close Price</th><th>Direction</th><th>Closing Quantity</th><th>Realised PNL</th><th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {posHistory.map((p, i) => (
-                    <tr key={i}>
+                    <tr 
+                      key={i}
+                      onClick={(e) => handleHistoryRowClick(e, i)}
+                      style={{ 
+                        cursor: 'pointer',
+                        backgroundColor: selectedHistoryIndices.has(i) ? 'rgba(255, 255, 255, 0.1)' : 'transparent' 
+                      }}
+                    >
                       <td>{p.symbol} Spot</td>
+                      <td>{p.strategy}</td>
                       <td>{p.openTime ? new Date(p.openTime).toLocaleString() : ''}</td>
                       <td>{p.closeTime ? new Date(p.closeTime).toLocaleString() : ''}</td>
                       <td>{p.entryPrice}</td>
@@ -341,7 +420,14 @@ export default function Dashboard() {
                 </thead>
                 <tbody>
                   {history.map((h, i) => (
-                    <tr key={i}>
+                    <tr 
+                      key={i}
+                      onClick={(e) => handleOrderRowClick(e, i)}
+                      style={{ 
+                        cursor: 'pointer',
+                        backgroundColor: selectedOrderIndices.has(i) ? 'rgba(255, 255, 255, 0.1)' : 'transparent' 
+                      }}
+                    >
                       <td>{new Date(h.time).toLocaleString()}</td>
                       <td>{h.botId}</td>
                       <td>{h.symbol}</td>

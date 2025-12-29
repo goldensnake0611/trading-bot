@@ -26,9 +26,9 @@ export async function startBot(req, res) {
   return res.json({ id })
 }
 
-export function stopBot(req, res) {
+export async function stopBot(req, res) {
   const { id } = req.body
-  const stopped = botEngine.stopBot(id)
+  const stopped = await botEngine.stopBot(id)
   return res.json({ stopped })
 }
 
@@ -67,6 +67,7 @@ export function getPositions(req, res) {
     return {
       id: b.id,
       symbol: b.symbol,
+      strategy: b.strategy,
       side: b.positionSide,
       entry: b.entry,
       current: b.lastPrice,

@@ -84,7 +84,7 @@ export async function startBot({ apiKey, secretKey, symbol, vol, tpPct, slPct, s
   return id
 }
 
-function checkDailyLossLimit(bot) {
+async function checkDailyLossLimit(bot) {
   const limit = Number(process.env.DAILY_LOSS_LIMIT || 10)
   const today = new Date().setHours(0,0,0,0)
   
@@ -95,17 +95,32 @@ function checkDailyLossLimit(bot) {
     
   if (dailyPnl <= -limit) {
     const msg = `Daily Loss Limit Reached: ${dailyPnl.toFixed(2)} <= -${limit}`
-    console.warn(`[${bot.id}] ${msg}. Stopping bot.`)
-    stopBot(bot.id, msg)
-    return true // Limit reached
+    // Only log once per minute to avoid spamming
+    const lastLog = bot.lastLossLimitLog || 0
+    if (Date.now() - lastLog > 60000) {
+      console.warn(`[${bot.id}] ${msg}. Pausing trading until tomorrow.`)
+      bot.lastLossLimitLog = Date.now()
+    }
+    return true // Limit reached, pause trading
   }
   return false
 }
 
-export function stopBot(id, reason = null) {
+export async function stopBot(id, reason = null) {
   const bot = bots.get(id)
   if (bot) {
     clearInterval(bot.timer)
+    
+    // Auto-close position if open
+    if (bot.positionSide) {
+      console.log(`[${id}] Stopping bot with open position. Closing now...`)
+      try {
+        await executeSell(bot, reason || 'Bot Stopped')
+      } catch (e) {
+        console.error(`[${id}] Failed to auto-close position:`, e)
+      }
+    }
+
     bots.delete(id)
     
     if (reason) {
@@ -211,7 +226,7 @@ async function executeSell(bot, reason) {
 async function strategyTick(bot) {
 
   // Check Daily Loss Limit first
-  if (checkDailyLossLimit(bot)) return
+  if (await checkDailyLossLimit(bot)) return
 
   const { symbol, apiKey, secretKey, vol, tpPct, slPct, strategy } = bot
   
