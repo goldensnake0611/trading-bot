@@ -22,19 +22,15 @@ app.use(session({
   cookie: { maxAge: 24 * 60 * 60 * 1000 } // 24 hours
 }))
 
-// Serve static frontend assets (but do not automatically serve index.html on root)
-app.use(express.static(path.join(__dirname, 'frontend'), { index: false }))
+// Serve static frontend assets
+app.use(express.static(path.join(__dirname, 'client/dist')))
 
 // API Routes
 app.use('/api', apiRoutes)
 
-// Root Route - Serve Login or Dashboard
-app.get('/', (req, res) => {
-  if (req.session.authenticated) {
-    res.sendFile(path.join(__dirname, 'frontend', 'index.html'))
-  } else {
-    res.sendFile(path.join(__dirname, 'frontend', 'login.html'))
-  }
+// React SPA - Fallback to index.html for all non-API routes
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'client/dist', 'index.html'))
 })
 
 // Start Server

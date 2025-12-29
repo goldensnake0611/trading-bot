@@ -8,6 +8,7 @@ const router = express.Router()
 // Auth Routes
 router.post('/login', authController.login)
 router.post('/logout', authController.logout)
+router.get('/check-auth', authController.checkAuth)
 
 // Protected Trading Routes
 router.use(requireAuth) // Apply auth middleware to all routes below

@@ -14,3 +14,11 @@ export function logout(req, res) {
   req.session.destroy()
   res.json({ success: true })
 }
+
+export function checkAuth(req, res) {
+  if (req.session.authenticated) {
+    res.json({ authenticated: true })
+  } else {
+    res.status(401).json({ authenticated: false })
+  }
+}
