@@ -3,32 +3,162 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>MEXC Futures Bot</title>
+    <title>MEXC Spot Trading Bot</title>
     <style>
-      body { font-family: system-ui, sans-serif; margin: 24px; }
-      label { display:block; margin:8px 0 4px; }
-      input, select { padding:8px; width:280px; }
-      button { padding:10px 16px; margin-top:12px; }
-      .row { margin-bottom:12px; }
-      .card { border:1px solid #ddd; padding:12px; max-width: 640px; }
-      pre { background:#f6f8fa; padding:12px; overflow:auto; }
-      #symbolPicker { display:flex; flex-wrap: wrap; gap:8px; margin: 8px 0; }
-      #symbolPicker button { margin:0; padding:6px 10px; }
+      body { 
+        font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+        margin: 0; 
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        display: flex; 
+        justify-content: center; 
+        align-items: center;
+        min-height: 100vh;
+        color: #e0e0e0;
+      }
+      .container { width: 100%; max-width: 900px; padding: 20px; }
+      .card { 
+        background: rgba(30, 30, 46, 0.95);
+        border-radius: 24px;
+        padding: 32px; 
+        box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+        border: 1px solid rgba(255,255,255,0.05);
+      }
+      h1 { text-align: center; color: #d46a84; font-weight: 600; margin-top: 0; margin-bottom: 24px; font-size: 22px; letter-spacing: -0.5px; text-shadow: 0 2px 10px rgba(0,0,0,0.2); }
+      .balance-box {
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 16px;
+        padding: 16px 20px;
+        margin-bottom: 24px;
+        border: 1px solid rgba(212, 106, 132, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 14px;
+        color: #d46a84;
+      }
+      .balance-box strong { color: #eebbcc; }
+      label { display:block; margin:16px 0 8px; font-weight: 600; color: #8888aa; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+      input, select { 
+        padding: 12px; 
+        width: 100%; 
+        box-sizing: border-box; 
+        border: 2px solid #2a2a3a; 
+        border-radius: 12px; 
+        font-size: 14px;
+        transition: all 0.2s;
+        background: #0f0f16;
+        color: #ccc;
+      }
+      input:focus, select:focus { border-color: #a61e4d; outline: none; background: #08080c; box-shadow: 0 0 10px rgba(166, 30, 77, 0.2); }
+      
+      .btn-primary { 
+        background: linear-gradient(135deg, #701e38 0%, #4a148c 100%);
+        border: none;
+        border-radius: 100px;
+        color: #f0f0f0;
+        padding: 14px 28px;
+        cursor: pointer;
+        font-weight: 700;
+        font-size: 14px;
+        width: 100%;
+        margin-top: 10px;
+        box-shadow: 0 10px 20px rgba(0,0,0,0.4);
+        transition: transform 0.2s, box-shadow 0.2s;
+      }
+      .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 15px 25px rgba(0,0,0,0.5); }
+      .btn-primary:active { transform: scale(0.98); }
+      
+      .btn-stop { background: linear-gradient(135deg, #333 0%, #555 100%); box-shadow: 0 10px 20px rgba(0,0,0,0.4); color: #ccc; }
+      .btn-stop:hover { box-shadow: 0 15px 25px rgba(0,0,0,0.5); }
+      
+      .tabs { display: flex; gap: 10px; margin-bottom: 24px; padding: 4px; background: rgba(0,0,0,0.2); border-radius: 100px; }
+      .tab-btn { 
+        flex: 1; 
+        padding: 10px; 
+        text-align: center; 
+        cursor: pointer; 
+        border-radius: 100px; 
+        font-size: 13px; 
+        font-weight: 600; 
+        color: #888;
+        border: none;
+        background: transparent;
+        transition: all 0.2s;
+      }
+      .tab-btn:hover { color: #ccc; }
+      /* Simple active state simulation for now */
+      
+      pre { background:#12121a; padding:15px; border-radius: 12px; border: 1px solid #333; font-size: 11px; color: #aaa; overflow: auto; }
+      
+      table { width: 100%; border-collapse: collapse; font-size: 11px; white-space: nowrap; }
+      th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #333; }
+      th { color: #d46a84; font-weight: 600; background: #1f1f2e; position: sticky; top: 0; text-shadow: 0 0 5px rgba(0,0,0,0.2); }
+      td { color: #d0d0e0; }
+      .table-wrapper { 
+        overflow-x: auto; 
+        -webkit-overflow-scrolling: touch; 
+        border-radius: 12px; 
+        border: 1px solid #333; 
+        margin-top: 10px; 
+        box-shadow: inset 0 0 10px rgba(0,0,0,0.3);
+      }
+      /* Custom scrollbar for webkit */
+      .table-wrapper::-webkit-scrollbar { height: 6px; }
+      .table-wrapper::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
+      .table-wrapper::-webkit-scrollbar-track { background: #222; }
+
+      .dropdown-wrapper { position: relative; }
+      .dropdown-list {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: #1e1e2e;
+        border: 1px solid #333;
+        border-radius: 12px;
+        max-height: 250px;
+        overflow-y: auto;
+        z-index: 1000;
+        display: none;
+        box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+        margin-top: 4px;
+      }
+      .dropdown-item {
+        padding: 12px;
+        cursor: pointer;
+        color: #ccc;
+        border-bottom: 1px solid #2a2a3a;
+        font-size: 14px;
+      }
+      .dropdown-item:last-child { border-bottom: none; }
+      .dropdown-item:hover { background: #2a2a3a; color: #fff; }
+      /* Scrollbar for dropdown */
+      .dropdown-list::-webkit-scrollbar { width: 6px; }
+      .dropdown-list::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
+      .dropdown-list::-webkit-scrollbar-track { background: #222; }
     </style>
   </head>
   <body>
-    <h1>MEXC Spot Trading Bot</h1>
-    <div class="card">
-      <div style="display:flex; gap:12px; margin-bottom:12px;">
-        <button id="tabTrading">Trading</button>
-        <button id="tabHistory">History</button>
-      </div>
+    <div class="container">
+      <div class="card">
+        <h1>MEXC Spot Trading Bot v2.0</h1>
+        <div class="balance-box">
+          <div><strong>Balance:</strong> <span id="balanceDisplay">Loading...</span></div>
+          <button onclick="checkBalance()" style="background: rgba(255,255,255,0.05); color: #d46a84; padding: 6px 14px; font-size: 12px; border-radius: 100px; margin: 0; box-shadow: none; border: 1px solid rgba(212, 106, 132, 0.2);">Refresh</button>
+        </div>
 
-      <div id="viewTrading">
+        <div class="tabs">
+          <button id="tabTrading" class="tab-btn" style="background: #1f1f2e; box-shadow: 0 2px 5px rgba(0,0,0,0.2); color: #d46a84;">Trading</button>
+          <button id="tabHistory" class="tab-btn">History</button>
+        </div>
+
+        <div id="viewTrading">
         <label>
           Symbol
-          <input type="text" id="symbol" list="symbols" placeholder="e.g. BTCUSDT" onchange="updateSymbol(this.value)">
-          <datalist id="symbols"></datalist>
+          <div class="dropdown-wrapper">
+            <input type="text" id="symbol" placeholder="e.g. BTCUSDT" autocomplete="off">
+            <div id="symbolList" class="dropdown-list"></div>
+          </div>
         </label>
 
         <label>
@@ -44,43 +174,51 @@
           <label>Stop Loss (%)</label>
           <input id="slPct" type="number" step="0.001" value="0.005" />
         </div>
-        <button id="startBtn">Start</button>
-        <button id="stopBtn">Stop</button>
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+          <button id="startBtn" class="btn-primary">Start Trading</button>
+          <button id="stopBtn" class="btn-primary btn-stop">Stop Bot</button>
+        </div>
 
         <h2>Status</h2>
         <pre id="status"></pre>
 
         <h2>Positions</h2>
-        <table border="1" cellpadding="6" cellspacing="0">
-          <thead>
-            <tr>
-              <th>ID</th><th>Symbol</th><th>Side</th><th>Entry</th><th>Current</th><th>Vol</th><th>Lev</th><th>TP</th><th>SL</th><th>PNL</th><th>ROI %</th>
-            </tr>
-          </thead>
-          <tbody id="positions"></tbody>
-        </table>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th><th>Symbol</th><th>Side</th><th>Entry</th><th>Current</th><th>Vol</th><th>Lev</th><th>TP</th><th>SL</th><th>PNL</th><th>ROI %</th>
+              </tr>
+            </thead>
+            <tbody id="positions"></tbody>
+          </table>
+        </div>
       </div>
 
       <div id="viewHistory" style="display:none;">
         <h2>Position History</h2>
-        <table border="1" cellpadding="6" cellspacing="0">
-          <thead>
-            <tr>
-              <th>Spot</th><th>Open Time</th><th>Close Time</th><th>Avg Entry Price</th><th>Avg Close Price</th><th>Direction</th><th>Closing Quantity</th><th>Realised PNL</th><th>Status</th>
-            </tr>
-          </thead>
-          <tbody id="positionsHistory"></tbody>
-        </table>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Spot</th><th>Open Time</th><th>Close Time</th><th>Avg Entry Price</th><th>Avg Close Price</th><th>Direction</th><th>Closing Quantity</th><th>Realised PNL</th><th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="positionsHistory"></tbody>
+          </table>
+        </div>
 
         <h2>Order History</h2>
-        <table border="1" cellpadding="6" cellspacing="0">
-          <thead>
-            <tr>
-              <th>Time</th><th>Bot</th><th>Symbol</th><th>Side</th><th>Price</th><th>Vol</th><th>Lev</th><th>Status</th><th>Event</th><th>PNL</th><th>ROI %</th>
-            </tr>
-          </thead>
-          <tbody id="history"></tbody>
-        </table>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th><th>Bot</th><th>Symbol</th><th>Side</th><th>Price</th><th>Vol</th><th>Lev</th><th>Status</th><th>Event</th><th>PNL</th><th>ROI %</th>
+              </tr>
+            </thead>
+            <tbody id="history"></tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -90,9 +228,7 @@
       async function start() {
         const payload = {
           symbol: document.getElementById('symbol').value.trim(),
-          direction: document.getElementById('direction').value,
           vol: Number(document.getElementById('vol').value),
-          leverage: Number(document.getElementById('leverage').value),
           tpPct: Number(document.getElementById('tpPct').value),
           slPct: Number(document.getElementById('slPct').value)
         }
@@ -167,16 +303,33 @@
           </tr>
         `).join('')
       }
+      function updateTabStyles() {
+        const t1 = document.getElementById('tabTrading')
+        const t2 = document.getElementById('tabHistory')
+        const activeStyle = "background: #1f1f2e; box-shadow: 0 2px 5px rgba(0,0,0,0.2); color: #d46a84;"
+        const inactiveStyle = "background: transparent; box-shadow: none; color: #666;"
+        
+        if (activeTab === 'trading') {
+          t1.setAttribute('style', activeStyle)
+          t2.setAttribute('style', inactiveStyle)
+        } else {
+          t2.setAttribute('style', activeStyle)
+          t1.setAttribute('style', inactiveStyle)
+        }
+      }
+
       function showTrading() {
         document.getElementById('viewTrading').style.display = 'block'
         document.getElementById('viewHistory').style.display = 'none'
         activeTab = 'trading'
+        updateTabStyles()
         refreshTrading()
       }
       function showHistory() {
         document.getElementById('viewTrading').style.display = 'none'
         document.getElementById('viewHistory').style.display = 'block'
         activeTab = 'history'
+        updateTabStyles()
         refreshHistory()
       }
       document.getElementById('tabTrading').addEventListener('click', showTrading)
@@ -188,30 +341,87 @@
       async function loadContracts() {
         const res = await fetch('/api/contracts')
         contracts = await res.json()
-        renderContracts(contracts)
-      }
-      function renderContracts(list) {
-        const dd = document.getElementById('symbolDropdown')
-        dd.innerHTML = list.map(c => '<option value="' + c.symbol + '">' + (c.displayNameEn || c.symbol) + '</option>').join('')
-        if (list.length) {
-          document.getElementById('symbol').value = list[0].symbol
-          dd.value = list[0].symbol
+        // renderContracts(contracts) // Initial render not needed until interaction, or we can just setup listeners
+        if (contracts.length && !document.getElementById('symbol').value) {
+          document.getElementById('symbol').value = contracts[0].symbol
         }
       }
-      document.getElementById('symbolDropdown').addEventListener('change', (e) => {
-        document.getElementById('symbol').value = e.target.value
+
+      const symbolInput = document.getElementById('symbol')
+      const symbolList = document.getElementById('symbolList')
+
+      function updateDropdown(list) {
+        if (list.length === 0) {
+          symbolList.style.display = 'none'
+          return
+        }
+        symbolList.innerHTML = list.slice(0, 100).map(c => 
+          `<div class="dropdown-item" onmousedown="selectSymbol('${c.symbol}')">
+            ${c.baseCoin || c.symbol}/${c.quoteCoin || ''}
+           </div>`
+        ).join('')
+        symbolList.style.display = 'block'
+      }
+
+      function selectSymbol(val) {
+        symbolInput.value = val
+        symbolList.style.display = 'none'
+        updateSymbol(val)
+      }
+
+      symbolInput.addEventListener('focus', () => {
+        const val = symbolInput.value.toUpperCase()
+        const filtered = contracts.filter(c => c.symbol.includes(val))
+        updateDropdown(filtered)
       })
-      document.getElementById('symbolSearch').addEventListener('input', (e) => {
-        const q = e.target.value.trim().toLowerCase()
-        const filtered = contracts.filter(c => (c.symbol || '').toLowerCase().includes(q) || (c.displayNameEn || '').toLowerCase().includes(q))
-        renderContracts(filtered.length ? filtered : contracts)
+
+      symbolInput.addEventListener('input', () => {
+        const val = symbolInput.value.toUpperCase()
+        const filtered = contracts.filter(c => c.symbol.includes(val))
+        updateDropdown(filtered)
+        updateSymbol(val)
       })
+
+      symbolInput.addEventListener('blur', () => {
+        // Delay hiding to allow click event to register
+        setTimeout(() => {
+          symbolList.style.display = 'none'
+        }, 200)
+      })
+
+      function updateSymbol(val) {
+        console.log('Selected symbol:', val)
+      }
+
+      async function checkBalance() {
+        const el = document.getElementById('balanceDisplay')
+        el.textContent = 'Checking...'
+        try {
+          const res = await fetch('/api/balance')
+          if (res.status !== 200) {
+            const err = await res.json()
+            el.textContent = 'Error: ' + (err.msg || err.error || res.statusText)
+            return
+          }
+          const balances = await res.json()
+          if (balances.length === 0) {
+            el.textContent = 'No funds found.'
+          } else {
+            el.textContent = balances.map(b => `${b.asset}: ${b.free}`).join(', ')
+          }
+        } catch (e) {
+          el.textContent = 'Network Error'
+        }
+      }
 
       setInterval(() => {
         if (activeTab === 'trading') refreshTrading()
         else refreshHistory()
       }, 5000)
-      loadContracts().then(() => refreshTrading())
+      loadContracts().then(() => {
+        refreshTrading()
+        checkBalance()
+      })
     </script>
   </body>
 </html>

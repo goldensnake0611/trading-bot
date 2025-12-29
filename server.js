@@ -193,12 +193,17 @@ async function strategyTick(bot) {
 }
 
 app.post('/api/start', async (req, res) => {
+  console.log('Received start request:', req.body)
   const { apiKey, apiSecret, symbol, vol, tpPct, slPct } = req.body
   const resolvedKey = apiKey || process.env.MEXC_API_KEY
   const resolvedSecret = apiSecret || process.env.MEXC_API_SECRET
-  if (!resolvedKey || !resolvedSecret || !symbol) return res.status(400).json({ error: 'Missing credentials or symbol' })
+  if (!resolvedKey || !resolvedSecret || !symbol) {
+    console.error('Missing credentials or symbol')
+    return res.status(400).json({ error: 'Missing credentials or symbol' })
+  }
   
   const id = `${symbol}:${Date.now()}`
+  console.log('Starting bot with ID:', id)
   const bot = {
     id,
     apiKey: resolvedKey,
@@ -267,6 +272,39 @@ app.get('/api/history', (req, res) => {
 app.get('/api/positions_history', (req, res) => {
   const out = positionsHistory.slice().sort((a,b) => (b.openTime || 0) - (a.openTime || 0))
   res.json(out)
+})
+
+async function fetchAccountInfo(apiKey, secretKey) {
+  const timestamp = Date.now()
+  const query = `timestamp=${timestamp}`
+  const signature = sign(query, secretKey)
+  const url = `https://api.mexc.com/api/v3/account?${query}&signature=${signature}`
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'X-MEXC-APIKEY': apiKey
+    }
+  })
+  const data = await res.json().catch(() => ({}))
+  if (res.status !== 200) {
+    console.error('MEXC API Error:', res.status, JSON.stringify(data))
+  }
+  return { status: res.status, data }
+}
+
+app.get('/api/balance', async (req, res) => {
+  const apiKey = req.query.apiKey || process.env.MEXC_API_KEY
+  const secretKey = req.query.apiSecret || process.env.MEXC_API_SECRET
+  if (!apiKey || !secretKey) return res.status(400).json({ error: 'Missing API credentials' })
+  
+  const { status, data } = await fetchAccountInfo(apiKey, secretKey)
+  if (status !== 200) {
+    return res.status(status).json(data)
+  }
+  
+  // Filter for non-zero balances
+  const balances = (data.balances || []).filter(b => Number(b.free) > 0 || Number(b.locked) > 0)
+  res.json(balances)
 })
 
 app.get('/api/contracts', async (_req, res) => {
