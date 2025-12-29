@@ -103,3 +103,8 @@ export function getStrategies(req, res) {
   const strategies = botEngine.getAvailableStrategies()
   res.json(strategies)
 }
+
+export function getLogs(req, res) {
+  const logs = botEngine.getSystemLogs()
+  res.json(logs)
+}

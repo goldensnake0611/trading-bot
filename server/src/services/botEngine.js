@@ -27,9 +27,14 @@ export function getAvailableStrategies() {
 // In-memory state
 const bots = new Map()
 const positionsHistory = []
+const systemLogs = []
 
 export function getBots() {
   return [...bots.values()]
+}
+
+export function getSystemLogs() {
+  return systemLogs.slice(-50).reverse() // Last 50 logs, newest first
 }
 
 export function getBot(id) {
@@ -81,18 +86,29 @@ function checkDailyLossLimit(bot) {
     .reduce((sum, h) => sum + (Number(h.pnl) || 0), 0)
     
   if (dailyPnl <= -limit) {
-    console.warn(`[${bot.id}] Daily Loss Limit Reached: ${dailyPnl} <= -${limit}. Stopping bot.`)
-    stopBot(bot.id)
+    const msg = `Daily Loss Limit Reached: ${dailyPnl.toFixed(2)} <= -${limit}`
+    console.warn(`[${bot.id}] ${msg}. Stopping bot.`)
+    stopBot(bot.id, msg)
     return true // Limit reached
   }
   return false
 }
 
-export function stopBot(id) {
+export function stopBot(id, reason = null) {
   const bot = bots.get(id)
   if (bot) {
     clearInterval(bot.timer)
     bots.delete(id)
+    
+    if (reason) {
+      systemLogs.push({
+        time: Date.now(),
+        type: 'warning',
+        message: `Bot ${bot.symbol} stopped: ${reason}`,
+        botId: id
+      })
+    }
+    
     return true
   }
   return false
