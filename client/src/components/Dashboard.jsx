@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { Info } from 'lucide-react'
 import SymbolSearch from './SymbolSearch'
 
 export default function Dashboard() {
@@ -10,6 +11,7 @@ export default function Dashboard() {
   const [positions, setPositions] = useState([])
   const [history, setHistory] = useState([])
   const [posHistory, setPosHistory] = useState([])
+  const [strategiesList, setStrategiesList] = useState([])
   
   // Form State
   const [symbol, setSymbol] = useState('')

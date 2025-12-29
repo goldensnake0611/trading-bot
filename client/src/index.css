@@ -98,6 +98,60 @@ pre { background:#12121a; padding:15px; border-radius: 12px; border: 1px solid #
 table { width: 100%; border-collapse: collapse; font-size: 11px; white-space: nowrap; }
 th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #333; }
 th { color: #d46a84; font-weight: 600; background: #1f1f2e; position: sticky; top: 0; text-shadow: 0 0 5px rgba(0,0,0,0.2); }
+
+/* Tooltip */
+.tooltip-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  cursor: help;
+}
+.tooltip-container .info-icon {
+  color: #8888aa;
+  transition: color 0.2s;
+}
+.tooltip-container:hover .info-icon {
+  color: #d46a84;
+}
+.tooltip-text {
+  visibility: hidden;
+  width: 220px;
+  background-color: #1a1a2e;
+  color: #e0e0e0;
+  text-align: center;
+  border-radius: 8px;
+  padding: 8px 12px;
+  position: absolute;
+  z-index: 100;
+  bottom: 135%; /* Position above */
+  left: 50%;
+  transform: translateX(-50%);
+  opacity: 0;
+  transition: opacity 0.2s, bottom 0.2s;
+  font-size: 11px;
+  font-weight: normal;
+  text-transform: none;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+  border: 1px solid #d46a84;
+  pointer-events: none;
+  line-height: 1.4;
+}
+.tooltip-text::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -5px;
+  border-width: 5px;
+  border-style: solid;
+  border-color: #d46a84 transparent transparent transparent;
+}
+.tooltip-container:hover .tooltip-text {
+  visibility: visible;
+  opacity: 1;
+  bottom: 125%;
+}
 td { color: #d0d0e0; }
 .table-wrapper { 
   overflow-x: auto; 
