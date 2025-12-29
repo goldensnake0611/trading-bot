@@ -11,9 +11,14 @@ export function analyze(closes) {
   const ema50 = ema(closes.slice(-60), 50)
 
   const shouldBuy = ema20 > ema50 && price > ema20
+  const shouldSell = ema20 < ema50 // Cross back down
+
+  let action = 'HOLD'
+  if (shouldBuy) action = 'BUY'
+  if (shouldSell) action = 'SELL'
   
   return {
-    action: shouldBuy ? 'BUY' : 'HOLD',
+    action,
     indicators: {
       ema20,
       ema50,

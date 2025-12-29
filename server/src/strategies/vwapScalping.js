@@ -25,9 +25,15 @@ export function analyze(klines) {
   const highVolume = volume > (avgVol * 1.5)
 
   const shouldBuy = nearVwap && highVolume
+  // Sell if price is 2% above VWAP (Profit) or Drops 1% below VWAP (Stop)
+  const shouldSell = dist > 0.02 || dist < -0.01
+
+  let action = 'HOLD'
+  if (shouldBuy) action = 'BUY'
+  if (shouldSell) action = 'SELL'
   
   return {
-    action: shouldBuy ? 'BUY' : 'HOLD',
+    action,
     indicators: {
       price,
       vwap: currentVwap,

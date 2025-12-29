@@ -18,9 +18,14 @@ export function analyze(klines) {
   // Ideally: 50 > 200 AND Price > 200.
   
   const shouldBuy = price > ema200 && ema50 > ema200
+  const shouldSell = price < ema200 || ema50 < ema200 // Trend Broken
+
+  let action = 'HOLD'
+  if (shouldBuy) action = 'BUY'
+  if (shouldSell) action = 'SELL'
   
   return {
-    action: shouldBuy ? 'BUY' : 'HOLD',
+    action,
     indicators: {
       price,
       ema50,

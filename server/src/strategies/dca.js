@@ -15,8 +15,15 @@ export const description = 'Dollar Cost Averaging - Buy periodically regardless 
 export function analyze(klines) {
   const price = Number(klines.at(-1)[4])
   
+  // DCA usually doesn't have a strategy sell (it relies on TP).
+  // But we can add a fail-safe sell if price drops significantly (e.g. 10%) to protect capital?
+  // Or better, we just rely on TP/SL settings from the engine.
+  // Returning HOLD means "do nothing (keep position or wait)".
+  // Returning SELL would force a close.
+  // Let's keep it simple: DCA only buys. Exits are handled by TP/SL in engine.
+  
   return {
-    action: 'BUY', // Always buy
+    action: 'BUY', 
     indicators: {
       price,
       note: 'DCA Mode'

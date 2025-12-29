@@ -169,17 +169,22 @@ async function strategyTick(bot) {
     return
   }
 
-  // If holding, check TP/SL
+  // If holding, check TP/SL or Strategy SELL
   if (bot.positionSide === 'long') {
     const hitTp = price >= bot.tp
     const hitSl = price <= bot.sl
+    const strategySell = action === 'SELL'
     
-    if (hitTp || hitSl) {
+    if (hitTp || hitSl || strategySell) {
       const side = 'SELL'
       const externalOid = `${bot.id}:close:${Date.now()}`
       const res = await placeOrder({ apiKey, secretKey, symbol, side, type: 'MARKET', quantity: vol })
       
       const { pnl, roi } = computePnl(bot.entry, bot.vol, price)
+      
+      let reason = 'Strategy'
+      if (hitTp) reason = 'TP'
+      else if (hitSl) reason = 'SL'
       
       bot.history.push({
         time: Date.now(),
@@ -193,7 +198,7 @@ async function strategyTick(bot) {
         pnl,
         roi,
         externalOid,
-        reason: hitTp ? 'TP' : 'SL'
+        reason
       })
       
       if (typeof bot.currentPositionIndex === 'number') {

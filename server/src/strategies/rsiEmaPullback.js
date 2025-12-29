@@ -17,9 +17,14 @@ export function analyze(klines) {
   const isPullback = currentRsi >= 40 && currentRsi <= 55 // Expanded slightly for easier triggering
 
   const shouldBuy = isUptrend && isPullback
+  const shouldSell = currentRsi > 70 || price < ema20 // Overbought or Trend Broken
+
+  let action = 'HOLD'
+  if (shouldBuy) action = 'BUY'
+  if (shouldSell) action = 'SELL'
   
   return {
-    action: shouldBuy ? 'BUY' : 'HOLD',
+    action,
     indicators: {
       price,
       ema20,
