@@ -23,7 +23,10 @@
         box-shadow: 0 20px 40px rgba(0,0,0,0.5);
         border: 1px solid rgba(255,255,255,0.05);
       }
-      h1 { text-align: center; color: #d46a84; font-weight: 600; margin-top: 0; margin-bottom: 24px; font-size: 22px; letter-spacing: -0.5px; text-shadow: 0 2px 10px rgba(0,0,0,0.2); }
+      .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+      .logout-btn { background: none; border: 1px solid #d46a84; color: #d46a84; padding: 6px 12px; border-radius: 20px; font-size: 12px; cursor: pointer; transition: all 0.2s; }
+      .logout-btn:hover { background: #d46a84; color: white; }
+      h1 { text-align: center; color: #d46a84; font-weight: 600; margin: 0; font-size: 22px; letter-spacing: -0.5px; text-shadow: 0 2px 10px rgba(0,0,0,0.2); }
       .balance-box {
         background: rgba(0, 0, 0, 0.2);
         border-radius: 16px;
@@ -141,7 +144,10 @@
   <body>
     <div class="container">
       <div class="card">
-        <h1>MEXC Spot Trading Bot v2.0</h1>
+        <div class="header">
+          <h1>MEXC Spot Trading Bot v2.0</h1>
+          <button id="logoutBtn" class="logout-btn">Logout</button>
+        </div>
         <div class="balance-box">
           <div><strong>Balance:</strong> <span id="balanceDisplay">Loading...</span></div>
           <button onclick="checkBalance()" style="background: rgba(255,255,255,0.05); color: #d46a84; padding: 6px 14px; font-size: 12px; border-radius: 100px; margin: 0; box-shadow: none; border: 1px solid rgba(212, 106, 132, 0.2);">Refresh</button>
@@ -413,6 +419,11 @@
           el.textContent = 'Network Error'
         }
       }
+
+      document.getElementById('logoutBtn').addEventListener('click', async () => {
+        await fetch('/api/logout', { method: 'POST' })
+        window.location.reload()
+      })
 
       setInterval(() => {
         if (activeTab === 'trading') refreshTrading()

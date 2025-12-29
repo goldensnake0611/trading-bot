@@ -3,6 +3,7 @@ import crypto from 'crypto'
 import fetch from 'node-fetch'
 import path from 'path'
 import dotenv from 'dotenv'
+import session from 'express-session'
 import { fileURLToPath } from 'url'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -10,9 +11,55 @@ const __dirname = path.dirname(__filename)
 dotenv.config({ path: path.join(__dirname, '.env') })
 const app = express()
 app.use(express.json())
-app.use(express.static(path.join(__dirname, 'frontend')))
-app.get('/', (_req, res) => {
-  res.sendFile(path.join(__dirname, 'frontend', 'index.html'))
+
+// Session Middleware
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'trading_bot_secure_secret_99',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { maxAge: 24 * 60 * 60 * 1000 } // 24 hours
+}))
+
+// Auth Endpoints
+app.post('/api/login', (req, res) => {
+  const { username, password } = req.body
+  const adminUser = process.env.ADMIN_USER || 'admin'
+  const adminPass = process.env.ADMIN_PASS || 'admin123'
+  
+  if (username === adminUser && password === adminPass) {
+    req.session.authenticated = true
+    return res.json({ success: true })
+  }
+  return res.status(401).json({ error: 'Invalid credentials' })
+})
+
+app.post('/api/logout', (req, res) => {
+  req.session.destroy()
+  res.json({ success: true })
+})
+
+// Serve frontend assets but do not serve index.html automatically on root
+app.use(express.static(path.join(__dirname, 'frontend'), { index: false }))
+
+// Root Route - Serve Login or Dashboard
+app.get('/', (req, res) => {
+  if (req.session.authenticated) {
+    res.sendFile(path.join(__dirname, 'frontend', 'index.html'))
+  } else {
+    res.sendFile(path.join(__dirname, 'frontend', 'login.html'))
+  }
+})
+
+// Auth Middleware for API
+app.use('/api/*', (req, res, next) => {
+  // Login/Logout already handled above, but just in case of ordering issues (though they are defined before this use)
+  // Actually, express matches top-down. The specific routes above are matched first.
+  // This middleware catches all OTHER /api/* requests.
+  if (req.session.authenticated) {
+    next()
+  } else {
+    res.status(401).json({ error: 'Unauthorized' })
+  }
 })
 
 // In-memory bot state
