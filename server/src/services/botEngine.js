@@ -134,16 +134,20 @@ async function executeSell(bot, reason) {
 
   const side = 'SELL'
   const externalOid = `${bot.id}:close:${Date.now()}`
-  const res = await placeOrder({ apiKey, secretKey, symbol, side, type: 'MARKET', quantity: vol })
   
-  const { pnl, roi } = computePnl(entry, vol, price)
+  // Use heldVol (Base Asset Qty) if available, otherwise estimate from vol (USDT) / entry
+  const quantityToSell = bot.heldVol || (vol / entry)
+  
+  const res = await placeOrder({ apiKey, secretKey, symbol, side, type: 'MARKET', quantity: quantityToSell })
+  
+  const { pnl, roi } = computePnl(entry, quantityToSell, price)
   
   bot.history.push({
     time: Date.now(),
     symbol,
     side: 'SELL',
     price,
-    vol,
+    vol: quantityToSell,
     status: res.status,
     data: res.data,
     event: 'close',
@@ -158,7 +162,7 @@ async function executeSell(bot, reason) {
     if (pos) {
       pos.closeTime = Date.now()
       pos.closePrice = price
-      pos.closingQuantity = vol
+      pos.closingQuantity = quantityToSell
       pos.realizedPnl = pnl
       pos.realizedRoi = roi
       pos.status = (res.status === 200 && !res.data.code) ? 'Closed' : `Error (${res.status})`
@@ -170,6 +174,7 @@ async function executeSell(bot, reason) {
   bot.entry = null
   bot.tp = null
   bot.sl = null
+  bot.heldVol = null
   
   return { success: true, pnl, roi, price }
 }
@@ -220,8 +225,9 @@ async function strategyTick(bot) {
   if (!bot.positionSide && action === 'BUY') {
     const side = 'BUY'
     const externalOid = `${bot.id}:open:${Date.now()}`
-    // Market buy by quantity (base asset)
-    const res = await placeOrder({ apiKey, secretKey, symbol, side, type: 'MARKET', quantity: vol })
+    // Market buy by quoteOrderQty (USDT amount)
+    // vol is now USDT amount
+    const res = await placeOrder({ apiKey, secretKey, symbol, side, type: 'MARKET', quoteOrderQty: vol })
     
     bot.lastOrder = res
     if (res.status !== 200 || (res.data && res.data.code)) {
@@ -230,6 +236,17 @@ async function strategyTick(bot) {
         return 
     }
     
+    // Determine executed quantity (Base Asset)
+    let executedQty = 0
+    if (res.data && res.data.executedQty) {
+      executedQty = Number(res.data.executedQty)
+    } else {
+      // Fallback for simulation or if API doesn't return immediate fill details
+      executedQty = vol / price
+    }
+    
+    bot.heldVol = executedQty
+
     // Assume filled at current price for simulation/tracking
     bot.entry = price 
     bot.tp = price * (1 + tpPct/100)
@@ -242,7 +259,8 @@ async function strategyTick(bot) {
       symbol,
       side: 'BUY',
       price,
-      vol,
+      vol: executedQty, // Log base asset qty
+      usdtVal: vol,     // Log USDT value
       status: res.status,
       data: res.data,
       event: 'open',
@@ -257,7 +275,7 @@ async function strategyTick(bot) {
       openTime: Date.now(),
       entryPrice: price,
       direction: 'Long',
-      vol,
+      vol: executedQty,
       status: 'Opened'
     }
     positionsHistory.push(pos)

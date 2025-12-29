@@ -17,7 +17,7 @@ export default function Dashboard() {
   // Form State
   const [symbol, setSymbol] = useState('')
   const [strategy, setStrategy] = useState('trend-following')
-  const [vol, setVol] = useState(1)
+  const [vol, setVol] = useState(10)
   const [tpPct, setTpPct] = useState(1)
   const [slPct, setSlPct] = useState(0.5)
 
@@ -211,8 +211,8 @@ export default function Dashboard() {
             </label>
 
             <label>
-              Position Size (Base Asset Qty)
-              <input type="number" value={vol} onChange={e => setVol(e.target.value)} step="0.0001" />
+              Position Size (USDT)
+              <input type="number" value={vol} onChange={e => setVol(e.target.value)} step="1" />
             </label>
 
             <label>
