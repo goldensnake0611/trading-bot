@@ -1,7 +1,7 @@
 import { vwap } from '../utils/math.js'
 
 export const name = 'VWAP Scalping'
-export const description = 'Buy when Price bounces off VWAP with volume'
+export const description = 'Buy when Price bounces off VWAP with volume. Sell when Price is 2% above or 1% below VWAP.'
 
 export function analyze(klines) {
   if (klines.length < 50) return { action: 'HOLD' }

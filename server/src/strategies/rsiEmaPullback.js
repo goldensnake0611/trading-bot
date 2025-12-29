@@ -1,7 +1,7 @@
 import { ema, rsi } from '../utils/math.js'
 
 export const name = 'RSI + EMA Pullback'
-export const description = 'Buy when Price > 20 EMA and RSI pulls back to 40-50'
+export const description = 'Buy when Price > 20 EMA and RSI is 40-55. Sell when RSI > 70 or Price < 20 EMA.'
 
 export function analyze(klines) {
   if (klines.length < 50) return { action: 'HOLD' }

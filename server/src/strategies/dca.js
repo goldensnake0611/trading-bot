@@ -1,5 +1,5 @@
 export const name = 'DCA'
-export const description = 'Dollar Cost Averaging - Buy periodically regardless of price'
+export const description = 'Dollar Cost Averaging - Buy immediately/periodically. Sell is handled by TP/SL only.'
 
 // DCA is time-based, not price-action based.
 // The bot engine loop runs every 10s (or 1m).

@@ -1,7 +1,7 @@
 import { ema } from '../utils/math.js'
 
 export const name = 'EMA Crossover'
-export const description = 'Buy when EMA20 > EMA50 and Price > EMA20'
+export const description = 'Buy when EMA20 > EMA50 and Price > EMA20. Sell when EMA20 < EMA50.'
 
 export function analyze(closes) {
   if (closes.length < 60) return { action: 'HOLD' }

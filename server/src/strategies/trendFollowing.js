@@ -1,7 +1,7 @@
 import { ema } from '../utils/math.js'
 
 export const name = 'Trend Following'
-export const description = 'Buy when Price > 200 EMA and 50 EMA crosses above 200 EMA'
+export const description = 'Buy when Price > 200 EMA and 50 EMA > 200 EMA. Sell when Price < 200 EMA or 50 EMA < 200 EMA.'
 
 export function analyze(klines) {
   if (klines.length < 200) return { action: 'HOLD' }
