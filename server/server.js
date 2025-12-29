@@ -23,14 +23,14 @@ app.use(session({
 }))
 
 // Serve static frontend assets
-app.use(express.static(path.join(__dirname, 'client/dist')))
+app.use(express.static(path.join(__dirname, '../client/dist')))
 
 // API Routes
 app.use('/api', apiRoutes)
 
 // React SPA - Fallback to index.html for all non-API routes
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'client/dist', 'index.html'))
+  res.sendFile(path.join(__dirname, '../client/dist', 'index.html'))
 })
 
 // Start Server
