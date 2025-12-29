@@ -112,6 +112,26 @@ export default function Dashboard() {
     refreshTrading()
   }
 
+  async function manualSell(id) {
+    if (!confirm('Are you sure you want to sell this position immediately?')) return
+    try {
+      const res = await fetch('/api/sell', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      })
+      if (res.ok) {
+        alert('Sell order executed successfully')
+        refreshTrading()
+      } else {
+        const err = await res.json()
+        alert('Sell failed: ' + (err.error || 'Unknown error'))
+      }
+    } catch (e) {
+      alert('Network error')
+    }
+  }
+
   // Helper to find active bot ID for current symbol (simplified)
   // In reality user might run multiple bots.
   // For the UI buttons "Stop Bot", we need to know which one.
@@ -220,7 +240,7 @@ export default function Dashboard() {
               <table>
                 <thead>
                   <tr>
-                    <th>ID</th><th>Symbol</th><th>Side</th><th>Entry</th><th>Current</th><th>Vol</th><th>TP</th><th>SL</th><th>PNL</th><th>ROI %</th>
+                    <th>ID</th><th>Symbol</th><th>Side</th><th>Entry</th><th>Current</th><th>Vol</th><th>TP</th><th>SL</th><th>PNL</th><th>ROI %</th><th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -236,6 +256,24 @@ export default function Dashboard() {
                       <td>{p.sl}</td>
                       <td>{p.pnl?.toFixed ? p.pnl.toFixed(6) : p.pnl}</td>
                       <td>{p.roi?.toFixed ? p.roi.toFixed(4) : p.roi}</td>
+                      <td>
+                        {p.side && (
+                          <button 
+                            onClick={() => manualSell(p.id)}
+                            style={{
+                              padding: '4px 8px',
+                              fontSize: '12px',
+                              background: '#ff4d4d',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Sell
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

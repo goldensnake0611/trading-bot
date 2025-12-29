@@ -30,6 +30,17 @@ export function stopBot(req, res) {
   return res.json({ stopped })
 }
 
+export async function sellPosition(req, res) {
+  const { id } = req.body
+  try {
+    const result = await botEngine.sellPosition(id)
+    return res.json(result)
+  } catch(e) {
+    console.error('Manual sell failed:', e)
+    return res.status(400).json({ error: e.message })
+  }
+}
+
 export function getStatus(req, res) {
   const bots = botEngine.getBots()
   const out = bots.map(b => ({ 

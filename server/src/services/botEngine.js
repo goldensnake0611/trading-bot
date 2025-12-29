@@ -114,6 +114,66 @@ export function stopBot(id, reason = null) {
   return false
 }
 
+export async function sellPosition(botId) {
+  const bot = bots.get(botId)
+  if (!bot) throw new Error('Bot not found')
+  if (!bot.positionSide) throw new Error('No open position to sell')
+
+  return await executeSell(bot, 'Manual')
+}
+
+async function executeSell(bot, reason) {
+  const { apiKey, secretKey, symbol, vol, entry } = bot
+  // Get current price for PnL calculation if possible, or use last known
+  // Better to fetch fresh price
+  let price = bot.lastPrice
+  try {
+     const kl = await fetchKlines(symbol, '1m')
+     if (kl && kl.length > 0) price = Number(kl.at(-1)[4])
+  } catch(e) {}
+
+  const side = 'SELL'
+  const externalOid = `${bot.id}:close:${Date.now()}`
+  const res = await placeOrder({ apiKey, secretKey, symbol, side, type: 'MARKET', quantity: vol })
+  
+  const { pnl, roi } = computePnl(entry, vol, price)
+  
+  bot.history.push({
+    time: Date.now(),
+    symbol,
+    side: 'SELL',
+    price,
+    vol,
+    status: res.status,
+    data: res.data,
+    event: 'close',
+    pnl,
+    roi,
+    externalOid,
+    reason
+  })
+  
+  if (typeof bot.currentPositionIndex === 'number') {
+    const pos = positionsHistory[bot.currentPositionIndex]
+    if (pos) {
+      pos.closeTime = Date.now()
+      pos.closePrice = price
+      pos.closingQuantity = vol
+      pos.realizedPnl = pnl
+      pos.realizedRoi = roi
+      pos.status = (res.status === 200 && !res.data.code) ? 'Closed' : `Error (${res.status})`
+    }
+  }
+  
+  // Reset position
+  bot.positionSide = null
+  bot.entry = null
+  bot.tp = null
+  bot.sl = null
+  
+  return { success: true, pnl, roi, price }
+}
+
 async function strategyTick(bot) {
   // Check Daily Loss Limit first
   if (checkDailyLossLimit(bot)) return
@@ -212,50 +272,11 @@ async function strategyTick(bot) {
     const strategySell = action === 'SELL'
     
     if (hitTp || hitSl || strategySell) {
-      const side = 'SELL'
-      const externalOid = `${bot.id}:close:${Date.now()}`
-      const res = await placeOrder({ apiKey, secretKey, symbol, side, type: 'MARKET', quantity: vol })
-      
-      const { pnl, roi } = computePnl(bot.entry, bot.vol, price)
-      
       let reason = 'Strategy'
       if (hitTp) reason = 'TP'
       else if (hitSl) reason = 'SL'
       
-      bot.history.push({
-        time: Date.now(),
-        symbol,
-        side: 'SELL',
-        price,
-        vol,
-        status: res.status,
-        data: res.data,
-        event: 'close',
-        pnl,
-        roi,
-        externalOid,
-        reason
-      })
-      
-      if (typeof bot.currentPositionIndex === 'number') {
-        const pos = positionsHistory[bot.currentPositionIndex]
-        if (pos) {
-          pos.closeTime = Date.now()
-          pos.closePrice = price
-          pos.closingQuantity = vol
-          pos.realizedPnl = pnl
-          pos.realizedRoi = roi
-          pos.status = (res.status === 200 && !res.data.code) ? 'Closed' : `Error (${res.status})`
-        }
-      }
-      
-      // Reset position
-      bot.positionSide = null
-      bot.entry = null
-      bot.tp = null
-      bot.sl = null
-      
-      // If DCA, we might want to NOT reset (accumulate), but for this simple version we trade in/out.
+      await executeSell(bot, reason)
     }
   }
 }
