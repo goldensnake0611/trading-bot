@@ -98,3 +98,8 @@ export async function getContracts(req, res) {
   const list = await fetchExchangeInfo()
   res.json(list)
 }
+
+export function getStrategies(req, res) {
+  const strategies = botEngine.getAvailableStrategies()
+  res.json(strategies)
+}

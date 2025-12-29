@@ -13,6 +13,7 @@ export default function Dashboard() {
   
   // Form State
   const [symbol, setSymbol] = useState('')
+  const [strategy, setStrategy] = useState('trend-following')
   const [vol, setVol] = useState(1)
   const [tpPct, setTpPct] = useState(1)
   const [slPct, setSlPct] = useState(0.5)
@@ -72,7 +73,7 @@ export default function Dashboard() {
     await fetch('/api/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ symbol, vol, tpPct, slPct })
+      body: JSON.stringify({ symbol, vol, tpPct, slPct, strategy })
     })
     refreshTrading()
   }
@@ -132,6 +133,17 @@ export default function Dashboard() {
             <label>
               Symbol
               <SymbolSearch value={symbol} onChange={setSymbol} />
+            </label>
+
+            <label>
+              Strategy
+              <select value={strategy} onChange={e => setStrategy(e.target.value)}>
+                <option value="trend-following">Trend Following (Safe)</option>
+                <option value="rsi-ema-pullback">RSI + EMA Pullback</option>
+                <option value="vwap-scalping">VWAP Scalping</option>
+                <option value="dca">DCA (Dollar Cost Averaging)</option>
+                <option value="ema-crossover">EMA Crossover (Simple)</option>
+              </select>
             </label>
 
             <label>
