@@ -3,7 +3,7 @@ import * as botEngine from '../services/botEngine.js'
 
 export async function startBot(req, res) {
   console.log('Received start request:', req.body)
-  const { apiKey, apiSecret, symbol, vol, tpPct, slPct } = req.body
+  const { apiKey, apiSecret, symbol, vol, tpPct, slPct, strategy, isPaperTrading } = req.body
   const resolvedKey = apiKey || process.env.MEXC_API_KEY
   const resolvedSecret = apiSecret || process.env.MEXC_API_SECRET
   
@@ -18,7 +18,9 @@ export async function startBot(req, res) {
     symbol,
     vol,
     tpPct,
-    slPct
+    slPct, 
+    strategy,
+    isPaperTrading
   })
   
   return res.json({ id })
@@ -118,4 +120,9 @@ export function getStrategies(req, res) {
 export function getLogs(req, res) {
   const logs = botEngine.getSystemLogs()
   res.json(logs)
+}
+
+export function getStats(req, res) {
+  const dailyPnl = botEngine.getDailyPnl()
+  res.json({ dailyPnl })
 }

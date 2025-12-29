@@ -26,7 +26,7 @@ export async function placeOrder({ apiKey, secretKey, symbol, side, type = 'MARK
   return { status: res.status, data }
 }
 
-export async function fetchKlines(symbol, interval = '1m', limit = 100) {
+export async function fetchKlines(symbol, interval = '1m', limit = 300) {
   const url = `https://api.mexc.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`
   const res = await fetch(url)
   const data = await res.json().catch(() => ([]))

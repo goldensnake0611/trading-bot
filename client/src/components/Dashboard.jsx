@@ -7,6 +7,7 @@ export default function Dashboard() {
   const { logout } = useAuth()
   const [activeTab, setActiveTab] = useState('trading')
   const [balance, setBalance] = useState('Loading...')
+  const [dailyPnl, setDailyPnl] = useState(0)
   const [status, setStatus] = useState([])
   const [positions, setPositions] = useState([])
   const [history, setHistory] = useState([])
@@ -20,6 +21,7 @@ export default function Dashboard() {
   const [vol, setVol] = useState(10)
   const [tpPct, setTpPct] = useState(1)
   const [slPct, setSlPct] = useState(0.5)
+  const [isPaperTrading, setIsPaperTrading] = useState(false)
 
   useEffect(() => {
     checkBalance()
@@ -78,6 +80,11 @@ export default function Dashboard() {
       setStatus(await sRes.json())
       const pRes = await fetch('/api/positions')
       setPositions(await pRes.json())
+      const stRes = await fetch('/api/stats')
+      if (stRes.ok) {
+        const stats = await stRes.json()
+        setDailyPnl(stats.dailyPnl)
+      }
     } catch(e) {}
   }
 
@@ -97,7 +104,7 @@ export default function Dashboard() {
     await fetch('/api/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ symbol, vol, tpPct, slPct, strategy })
+      body: JSON.stringify({ symbol, vol, tpPct, slPct, strategy, isPaperTrading })
     })
     refreshTrading()
   }
@@ -155,6 +162,9 @@ export default function Dashboard() {
 
         <div className="balance-box">
           <div><strong>Balance:</strong> {balance}</div>
+          <div style={{ marginLeft: '20px', color: dailyPnl >= 0 ? '#4caf50' : '#ff4d4d' }}>
+            <strong>Today's PnL:</strong> {dailyPnl ? dailyPnl.toFixed(4) : '0.0000'} USDT
+          </div>
           <button 
             onClick={checkBalance} 
             style={{background: 'rgba(255,255,255,0.05)', color: '#d46a84', padding: '6px 14px', fontSize: '12px', borderRadius: '100px', margin: 0, boxShadow: 'none', border: '1px solid rgba(212, 106, 132, 0.2)', cursor: 'pointer'}}
@@ -224,6 +234,19 @@ export default function Dashboard() {
               Stop Loss (%)
               <input type="number" value={slPct} onChange={e => setSlPct(e.target.value)} step="0.001" />
             </label>
+
+            <div style={{ margin: '15px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <input 
+                type="checkbox" 
+                id="paper-trading" 
+                checked={isPaperTrading} 
+                onChange={e => setIsPaperTrading(e.target.checked)} 
+                style={{ width: 'auto', margin: 0 }}
+              />
+              <label htmlFor="paper-trading" style={{ margin: 0, fontWeight: 'normal', cursor: 'pointer' }}>
+                Test Mode (Paper Trading) - No real orders
+              </label>
+            </div>
 
             <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
               <button onClick={startBot} className="btn-primary">Start Trading</button>

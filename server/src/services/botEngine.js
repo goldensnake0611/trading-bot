@@ -45,9 +45,16 @@ export function getPositionsHistory() {
   return positionsHistory
 }
 
-export async function startBot({ apiKey, secretKey, symbol, vol, tpPct, slPct, strategy }) {
+export function getDailyPnl() {
+  const today = new Date().setHours(0,0,0,0)
+  return positionsHistory
+    .filter(p => p.closeTime && p.closeTime >= today)
+    .reduce((sum, p) => sum + (Number(p.realizedPnl) || 0), 0)
+}
+
+export async function startBot({ apiKey, secretKey, symbol, vol, tpPct, slPct, strategy, isPaperTrading }) {
   const id = `${symbol}:${Date.now()}`
-  console.log('Starting bot with ID:', id, 'Strategy:', strategy)
+  console.log('Starting bot with ID:', id, 'Strategy:', strategy, 'Mode:', isPaperTrading ? 'Paper Trading' : 'Live')
   
   const bot = {
     id,
@@ -58,6 +65,7 @@ export async function startBot({ apiKey, secretKey, symbol, vol, tpPct, slPct, s
     tpPct: Number(tpPct || 1),
     slPct: Number(slPct || 0.5),
     strategy: strategy || 'trend-following', // Default
+    isPaperTrading: !!isPaperTrading,
     timer: null,
     lastOrder: null,
     entry: null,
@@ -71,7 +79,7 @@ export async function startBot({ apiKey, secretKey, symbol, vol, tpPct, slPct, s
   bots.set(id, bot)
   // Run immediately then interval
   strategyTick(bot).catch(console.error)
-  bot.timer = setInterval(() => strategyTick(bot).catch(console.error), 10_000)
+  bot.timer = setInterval(() => strategyTick(bot).catch(console.error), 5000)
   
   return id
 }
@@ -138,7 +146,28 @@ async function executeSell(bot, reason) {
   // Use heldVol (Base Asset Qty) if available, otherwise estimate from vol (USDT) / entry
   const quantityToSell = bot.heldVol || (vol / entry)
   
-  const res = await placeOrder({ apiKey, secretKey, symbol, side, type: 'MARKET', quantity: quantityToSell })
+  let res
+  if (bot.isPaperTrading) {
+    console.log(`[${bot.id}] Simulating SELL of ${quantityToSell} ${symbol} at ${price}`)
+    // Simulate successful sell
+    res = {
+      status: 200,
+      data: {
+        symbol,
+        orderId: 'sim_sell_' + Date.now(),
+        transactTime: Date.now(),
+        price: price,
+        origQty: quantityToSell,
+        executedQty: quantityToSell,
+        cummulativeQuoteQty: quantityToSell * price,
+        status: 'FILLED',
+        type: 'MARKET',
+        side: 'SELL'
+      }
+    }
+  } else {
+    res = await placeOrder({ apiKey, secretKey, symbol, side, type: 'MARKET', quantity: quantityToSell })
+  }
   
   const { pnl, roi } = computePnl(entry, quantityToSell, price)
   
@@ -180,6 +209,7 @@ async function executeSell(bot, reason) {
 }
 
 async function strategyTick(bot) {
+
   // Check Daily Loss Limit first
   if (checkDailyLossLimit(bot)) return
 
@@ -189,6 +219,7 @@ async function strategyTick(bot) {
   const strategyModule = strategies[strategy] || strategies['trend-following']
    
   const kl = await fetchKlines(symbol, '1m')
+
   // Spot klines: [time, open, high, low, close, vol, ...]
   if (!Array.isArray(kl) || kl.length < 200) return // Need enough history for EMA200
 
@@ -227,8 +258,33 @@ async function strategyTick(bot) {
     const externalOid = `${bot.id}:open:${Date.now()}`
     // Market buy by quoteOrderQty (USDT amount)
     // vol is now USDT amount
-    const res = await placeOrder({ apiKey, secretKey, symbol, side, type: 'MARKET', quoteOrderQty: vol })
     
+    let res
+    if (bot.isPaperTrading) {
+      console.log(`[${bot.id}] Simulating BUY of ${vol} USDT of ${symbol} at ~${price}`)
+      // Simulate successful buy
+      // We need to estimate executedQty based on price
+      const simulatedQty = vol / price
+      res = {
+        status: 200,
+        data: {
+          symbol,
+          orderId: 'sim_buy_' + Date.now(),
+          transactTime: Date.now(),
+          price: price,
+          origQuoteOrderQty: vol,
+          executedQty: simulatedQty,
+          cummulativeQuoteQty: vol,
+          status: 'FILLED',
+          type: 'MARKET',
+          side: 'BUY'
+        }
+      }
+    } else {
+      res = await placeOrder({ apiKey, secretKey, symbol, side, type: 'MARKET', quoteOrderQty: vol })
+    }
+
+    console.log("order status>>>>", res.status)
     bot.lastOrder = res
     if (res.status !== 200 || (res.data && res.data.code)) {
         // Failed
