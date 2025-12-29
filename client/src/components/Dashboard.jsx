@@ -22,6 +22,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     checkBalance()
+    fetchStrategies()
     const interval = setInterval(() => {
       if (activeTab === 'trading') refreshTrading()
       else refreshHistory()
@@ -32,6 +33,15 @@ export default function Dashboard() {
     
     return () => clearInterval(interval)
   }, [activeTab])
+
+  async function fetchStrategies() {
+    try {
+      const res = await fetch('/api/strategies')
+      if (res.ok) {
+        setStrategiesList(await res.json())
+      }
+    } catch (e) { console.error(e) }
+  }
 
   async function checkBalance() {
     setBalance('Checking...')
@@ -138,13 +148,27 @@ export default function Dashboard() {
             </label>
 
             <label>
-              Strategy
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                Strategy
+                <div className="tooltip-container">
+                  <Info size={14} className="info-icon" />
+                  <div className="tooltip-text">
+                    {strategiesList.find(s => s.id === strategy)?.description || 'Select a strategy to see description'}
+                  </div>
+                </div>
+              </div>
               <select value={strategy} onChange={e => setStrategy(e.target.value)}>
-                <option value="trend-following">Trend Following (Safe)</option>
-                <option value="rsi-ema-pullback">RSI + EMA Pullback</option>
-                <option value="vwap-scalping">VWAP Scalping</option>
-                <option value="dca">DCA (Dollar Cost Averaging)</option>
-                <option value="ema-crossover">EMA Crossover (Simple)</option>
+                {strategiesList.length > 0 ? strategiesList.map(s => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                )) : (
+                  <>
+                    <option value="trend-following">Trend Following (Safe)</option>
+                    <option value="rsi-ema-pullback">RSI + EMA Pullback</option>
+                    <option value="vwap-scalping">VWAP Scalping</option>
+                    <option value="dca">DCA (Dollar Cost Averaging)</option>
+                    <option value="ema-crossover">EMA Crossover (Simple)</option>
+                  </>
+                )}
               </select>
             </label>
 
