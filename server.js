@@ -19,78 +19,54 @@ app.get('/', (_req, res) => {
 const bots = new Map()
 const positionsHistory = []
 
-// MEXC sign helper (futures contract REST v1): HMAC-SHA256 of accessKey+timestamp
-function sign(accessKey, secretKey, timestamp) {
-  const payload = `${accessKey}${timestamp}`
-  return crypto.createHmac('sha256', secretKey).update(payload).digest('hex')
+// MEXC Spot V3 Sign
+function sign(queryString, secretKey) {
+  return crypto.createHmac('sha256', secretKey).update(queryString).digest('hex')
 }
 
-async function placeOrder({ accessKey, secretKey, symbol, side, price, vol, leverage, reduceOnly = false, externalOid, type = 1 }) {
-  const ts = Date.now()
-  const signature = sign(accessKey, secretKey, ts)
-  const url = 'https://contract.mexc.com/api/v1/order/submit'
-  const body = {
-    symbol,
-    price,
-    vol,
-    leverage,
-    side, // 1=open long, 2=open short, 3=close long, 4=close short (typical mapping)
-    type, // 1: limit, 2: market
-    reduceOnly,
-    externalOid
-  }
+async function placeOrder({ apiKey, secretKey, symbol, side, type = 'MARKET', quantity, quoteOrderQty, price }) {
+  const timestamp = Date.now()
+  let query = `symbol=${symbol}&side=${side}&type=${type}&timestamp=${timestamp}`
+  if (quantity) query += `&quantity=${quantity}`
+  if (quoteOrderQty) query += `&quoteOrderQty=${quoteOrderQty}`
+  if (price) query += `&price=${price}`
+  
+  const signature = sign(query, secretKey)
+  const url = `https://api.mexc.com/api/v3/order?${query}&signature=${signature}`
+
   const res = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'AccessKey': accessKey,
-      'Request-Time': String(ts),
-      'Signature': signature
-    },
-    body: JSON.stringify(body)
+      'X-MEXC-APIKEY': apiKey
+    }
   })
   const data = await res.json().catch(() => ({}))
   return { status: res.status, data }
 }
 
-async function fetchKlines(symbol, interval = 'Min1', start, end) {
-  const url = new URL(`https://contract.mexc.com/api/v1/contract/kline/${symbol}`)
-  url.searchParams.set('interval', interval)
-  if (start) url.searchParams.set('start', String(start))
-  if (end) url.searchParams.set('end', String(end))
+async function fetchKlines(symbol, interval = '1m', limit = 100) {
+  const url = `https://api.mexc.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`
   const res = await fetch(url)
-  const data = await res.json().catch(() => ({}))
+  const data = await res.json().catch(() => ([]))
   return data
 }
 
-async function fetchContracts() {
+async function fetchExchangeInfo() {
   try {
-    const url = 'https://contract.mexc.com/api/v1/contract/detail'
+    const url = 'https://api.mexc.com/api/v3/exchangeInfo'
     const res = await fetch(url)
     const json = await res.json().catch(() => null)
-    let arr = []
-    if (json && Array.isArray(json.data)) arr = json.data
-    else if (json && json.data && typeof json.data === 'object') arr = [json.data]
-    return arr.map(d => ({
-      symbol: d.symbol,
-      displayNameEn: d.displayNameEn || d.displayName || d.symbol,
-      baseCoin: d.baseCoin || (d.symbol ? d.symbol.split('_')[0] : ''),
-      quoteCoin: d.quoteCoin || (d.symbol ? d.symbol.split('_')[1] : ''),
-      maxLeverage: d.maxLeverage,
-      minLeverage: d.minLeverage
+    if (!json || !json.symbols) return []
+    return json.symbols.map(s => ({
+      symbol: s.symbol,
+      baseCoin: s.baseAsset,
+      quoteCoin: s.quoteAsset
     }))
   } catch {
     return [
-      { symbol: 'BTC_USDT', displayNameEn: 'BTC_USDT PERPETUAL', baseCoin: 'BTC', quoteCoin: 'USDT' },
-      { symbol: 'ETH_USDT', displayNameEn: 'ETH_USDT PERPETUAL', baseCoin: 'ETH', quoteCoin: 'USDT' },
-      { symbol: 'BNB_USDT', displayNameEn: 'BNB_USDT PERPETUAL', baseCoin: 'BNB', quoteCoin: 'USDT' },
-      { symbol: 'SOL_USDT', displayNameEn: 'SOL_USDT PERPETUAL', baseCoin: 'SOL', quoteCoin: 'USDT' },
-      { symbol: 'XRP_USDT', displayNameEn: 'XRP_USDT PERPETUAL', baseCoin: 'XRP', quoteCoin: 'USDT' },
-      { symbol: 'DOGE_USDT', displayNameEn: 'DOGE_USDT PERPETUAL', baseCoin: 'DOGE', quoteCoin: 'USDT' },
-      { symbol: 'ADA_USDT', displayNameEn: 'ADA_USDT PERPETUAL', baseCoin: 'ADA', quoteCoin: 'USDT' },
-      { symbol: 'TRX_USDT', displayNameEn: 'TRX_USDT PERPETUAL', baseCoin: 'TRX', quoteCoin: 'USDT' },
-      { symbol: 'LINK_USDT', displayNameEn: 'LINK_USDT PERPETUAL', baseCoin: 'LINK', quoteCoin: 'USDT' },
-      { symbol: 'LTC_USDT', displayNameEn: 'LTC_USDT PERPETUAL', baseCoin: 'LTC', quoteCoin: 'USDT' }
+      { symbol: 'BTCUSDT', baseCoin: 'BTC', quoteCoin: 'USDT' },
+      { symbol: 'ETHUSDT', baseCoin: 'ETH', quoteCoin: 'USDT' }
     ]
   }
 }
@@ -105,89 +81,62 @@ function ema(values, period) {
   return emaPrev
 }
 
-function atr(highs, lows, closes, period = 14) {
-  const trs = []
-  for (let i = 1; i < highs.length; i++) {
-    const tr = Math.max(
-      highs[i] - lows[i],
-      Math.abs(highs[i] - closes[i - 1]),
-      Math.abs(lows[i] - closes[i - 1])
-    )
-    trs.push(tr)
-  }
-  const avg = trs.slice(-period).reduce((a, b) => a + b, 0) / Math.max(1, Math.min(period, trs.length))
-  return avg
-}
-
-// Strategy: EMA cross + ATR-based stop width
-// - Entry long when EMA(20) > EMA(50) and price above EMA(20); short when EMA(20) < EMA(50) and price below EMA(20)
-// - Position size fixed by user (vol); leverage set by user
-// - TP/SL percentage from user applied on entry price
 async function strategyTick(bot) {
-  const { symbol, accessKey, secretKey, vol, leverage, tpPct, slPct, direction } = bot
+  const { symbol, apiKey, secretKey, vol, tpPct, slPct } = bot
    
-  const kl = await fetchKlines(symbol, 'Min1')
+  const kl = await fetchKlines(symbol, '1m')
+  // Spot klines: [time, open, high, low, close, vol, ...]
+  if (!Array.isArray(kl) || kl.length < 60) return
 
-  const rows = (Array.isArray(kl?.data) ? kl.data : []).map(r => ({
-    t: r.t || r.time || 0,
-    o: Number(r.o ?? r.open ?? 0),
-    h: Number(r.h ?? r.high ?? 0),
-    l: Number(r.l ?? r.low ?? 0),
-    c: Number(r.c ?? r.close ?? 0)
-  }))
-  if (rows.length < 60) return
-  const closes = rows.map(r => r.c)
-  const highs = rows.map(r => r.h)
-  const lows = rows.map(r => r.l)
+  const closes = kl.map(k => Number(k[4]))
   const price = closes.at(-1)
   bot.lastPrice = price
+  
   const ema20 = ema(closes.slice(-60), 20)
   const ema50 = ema(closes.slice(-60), 50)
-  const atr14 = atr(highs.slice(-60), lows.slice(-60), closes.slice(-60), 14)
 
-  let shouldLong = ema20 > ema50 && price > ema20
-  let shouldShort = ema20 < ema50 && price < ema20
-  if (direction === 'long') shouldShort = false
-  if (direction === 'short') shouldLong = false
+  // Long only strategy for Spot
+  const shouldBuy = ema20 > ema50 && price > ema20
 
-  // If no position, consider opening
-  if (!bot.positionSide && (shouldLong || shouldShort)) {
-    const side = shouldLong ? 1 : 2
+  // If no position, check for Buy
+  if (!bot.positionSide && shouldBuy) {
+    const side = 'BUY'
     const externalOid = `${bot.id}:open:${Date.now()}`
-    const res = await placeOrder({ accessKey, secretKey, symbol, side, price, vol, leverage, externalOid, type: 2 })
+    // Market buy by quantity (base asset)
+    const res = await placeOrder({ apiKey, secretKey, symbol, side, type: 'MARKET', quantity: vol })
+    
     bot.lastOrder = res
-    bot.entry = price
-    bot.tp = shouldLong ? price * (1 + tpPct) : price * (1 - tpPct)
-    bot.sl = shouldLong ? price * (1 - slPct) : price * (1 + slPct)
-    bot.positionSide = shouldLong ? 'long' : 'short'
+    if (res.status !== 200 || (res.data && res.data.code)) {
+        // Failed
+        return 
+    }
+    
+    // Assume filled at current price for simulation/tracking if real fill price not available easily without another call
+    bot.entry = price 
+    bot.tp = price * (1 + tpPct/100)
+    bot.sl = price * (1 - slPct/100)
+    bot.positionSide = 'long'
+    
     bot.history = bot.history || []
     bot.history.push({
       time: Date.now(),
       symbol,
-      side: bot.positionSide,
+      side: 'BUY',
       price,
       vol,
-      leverage,
       status: res.status,
       data: res.data,
       event: 'open',
       externalOid
     })
+    
     const pos = {
       botId: bot.id,
       symbol,
       openTime: Date.now(),
-      marginMode: 'Isolated',
       entryPrice: price,
-      closeTime: null,
-      closePrice: null,
-      liquidationPrice: null,
-      direction: bot.positionSide,
-      closingQuantity: null,
-      realizedPnl: null,
-      realizedRoi: null,
+      direction: 'Long',
       vol,
-      leverage,
       status: 'Opened'
     }
     positionsHistory.push(pos)
@@ -195,22 +144,24 @@ async function strategyTick(bot) {
     return
   }
 
-  // If in position, check TP/SL for close
-  if (bot.positionSide) {
-    const hitTp = bot.positionSide === 'long' ? price >= bot.tp : price <= bot.tp
-    const hitSl = bot.positionSide === 'long' ? price <= bot.sl : price >= bot.sl
+  // If holding, check TP/SL
+  if (bot.positionSide === 'long') {
+    const hitTp = price >= bot.tp
+    const hitSl = price <= bot.sl
+    
     if (hitTp || hitSl) {
-      const closeSide = bot.positionSide === 'long' ? 3 : 4
+      const side = 'SELL'
       const externalOid = `${bot.id}:close:${Date.now()}`
-      const res = await placeOrder({ accessKey, secretKey, symbol, side: closeSide, price, vol, leverage, reduceOnly: true, externalOid, type: 2 })
+      const res = await placeOrder({ apiKey, secretKey, symbol, side, type: 'MARKET', quantity: vol })
+      
       const { pnl, roi } = computePnl(bot, price)
+      
       bot.history.push({
         time: Date.now(),
         symbol,
-        side: bot.positionSide,
+        side: 'SELL',
         price,
         vol,
-        leverage,
         status: res.status,
         data: res.data,
         event: 'close',
@@ -218,6 +169,7 @@ async function strategyTick(bot) {
         roi,
         externalOid
       })
+      
       if (typeof bot.currentPositionIndex === 'number') {
         const pos = positionsHistory[bot.currentPositionIndex]
         if (pos) {
@@ -226,10 +178,11 @@ async function strategyTick(bot) {
           pos.closingQuantity = vol
           pos.realizedPnl = pnl
           pos.realizedRoi = roi
-          pos.status = res.status === 200 ? 'All Closed' : `Closed (${res.status})`
+          pos.status = (res.status === 200 && !res.data.code) ? 'Closed' : `Error (${res.status})`
         }
       }
-      // reset position
+      
+      // Reset
       bot.positionSide = null
       bot.entry = null
       bot.tp = null
@@ -239,23 +192,21 @@ async function strategyTick(bot) {
   }
 }
 
-// REST endpoints
 app.post('/api/start', async (req, res) => {
-  const { apiKey, apiSecret, symbol, vol, leverage, tpPct, slPct, direction } = req.body
+  const { apiKey, apiSecret, symbol, vol, tpPct, slPct } = req.body
   const resolvedKey = apiKey || process.env.MEXC_API_KEY
   const resolvedSecret = apiSecret || process.env.MEXC_API_SECRET
   if (!resolvedKey || !resolvedSecret || !symbol) return res.status(400).json({ error: 'Missing credentials or symbol' })
+  
   const id = `${symbol}:${Date.now()}`
   const bot = {
     id,
-    accessKey: resolvedKey,
+    apiKey: resolvedKey,
     secretKey: resolvedSecret,
     symbol,
     vol: Number(vol || 1),
-    leverage: Number(leverage || 5),
-    tpPct: Number(tpPct || 0.01),
-    slPct: Number(slPct || 0.005),
-    direction: direction || 'auto',
+    tpPct: Number(tpPct || 1),
+    slPct: Number(slPct || 0.5),
     timer: null,
     lastOrder: null,
     entry: null,
@@ -266,7 +217,7 @@ app.post('/api/start', async (req, res) => {
     history: []
   }
   bots.set(id, bot)
-  bot.timer = setInterval(() => strategyTick(bot).catch(() => {}), 10_000)
+  bot.timer = setInterval(() => strategyTick(bot).catch(console.error), 10_000)
   return res.json({ id })
 })
 
@@ -288,11 +239,9 @@ app.get('/api/status', (req, res) => {
 app.get('/api/positions', (req, res) => {
   const out = [...bots.values()].map(b => {
     const pnl = b.entry && b.lastPrice && b.vol
-      ? (b.positionSide === 'long'
-          ? (b.lastPrice - b.entry) * b.vol
-          : (b.entry - b.lastPrice) * b.vol)
+      ? (b.lastPrice - b.entry) * b.vol
       : 0
-    const margin = b.entry && b.vol && b.leverage ? (b.entry * b.vol) / b.leverage : null
+    const margin = b.entry && b.vol ? (b.entry * b.vol) : null
     const roi = margin ? (pnl / margin) * 100 : null
     return {
       id: b.id,
@@ -301,7 +250,6 @@ app.get('/api/positions', (req, res) => {
       entry: b.entry,
       current: b.lastPrice,
       vol: b.vol,
-      leverage: b.leverage,
       tp: b.tp,
       sl: b.sl,
       pnl,
@@ -322,17 +270,18 @@ app.get('/api/positions_history', (req, res) => {
 })
 
 app.get('/api/contracts', async (_req, res) => {
-  const list = await fetchContracts()
+  const list = await fetchExchangeInfo()
   res.json(list)
 })
 
 const port = process.env.PORT || 4000
 app.listen(port, () => console.log(`bot server listening on ${port}`))
+
 function computePnl(bot, exitPrice) {
   if (!bot.entry || !bot.vol) return { pnl: 0, roi: null }
-  const diff = bot.positionSide === 'long' ? (exitPrice - bot.entry) : (bot.entry - exitPrice)
+  const diff = exitPrice - bot.entry
   const pnl = diff * bot.vol
-  const margin = bot.entry && bot.leverage ? (bot.entry * bot.vol) / bot.leverage : null
+  const margin = bot.entry * bot.vol
   const roi = margin ? (pnl / margin) * 100 : null
   return { pnl, roi }
 }

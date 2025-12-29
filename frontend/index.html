@@ -17,7 +17,7 @@
     </style>
   </head>
   <body>
-    <h1>MEXC Futures Trading Bot</h1>
+    <h1>MEXC Spot Trading Bot</h1>
     <div class="card">
       <div style="display:flex; gap:12px; margin-bottom:12px;">
         <button id="tabTrading">Trading</button>
@@ -25,32 +25,21 @@
       </div>
 
       <div id="viewTrading">
-        <div class="row">
-          <label>Symbol</label>
-          <input id="symbolSearch" type="text" placeholder="Search symbol (e.g., BTC_USDT)" />
-          <select id="symbolDropdown"></select>
-          <input id="symbol" type="hidden" value="BTC_USDT" />
-        </div>
-        <div class="row">
-          <label>Direction</label>
-          <select id="direction">
-            <option value="auto">Auto</option>
-            <option value="long">Long only</option>
-            <option value="short">Short only</option>
-          </select>
-        </div>
-        <div class="row">
-          <label>Position Size (vol)</label>
-          <input id="vol" type="number" step="0.001" value="1" />
-        </div>
-        <div class="row">
-          <label>Leverage</label>
-          <input id="leverage" type="number" value="5" />
-        </div>
-        <div class="row">
-          <label>Take Profit (%)</label>
-          <input id="tpPct" type="number" step="0.001" value="0.01" />
-        </div>
+        <label>
+          Symbol
+          <input type="text" id="symbol" list="symbols" placeholder="e.g. BTCUSDT" onchange="updateSymbol(this.value)">
+          <datalist id="symbols"></datalist>
+        </label>
+
+        <label>
+          Position Size (Base Asset Qty)
+          <input type="number" id="vol" value="1" step="0.0001">
+        </label>
+
+        <label>
+          Take Profit (%) 
+          <input type="number" id="tpPct" value="1" step="0.1">
+        </label>
         <div class="row">
           <label>Stop Loss (%)</label>
           <input id="slPct" type="number" step="0.001" value="0.005" />
@@ -77,7 +66,7 @@
         <table border="1" cellpadding="6" cellspacing="0">
           <thead>
             <tr>
-              <th>Futures</th><th>Open Time</th><th>Close Time</th><th>Margin Mode</th><th>Avg Entry Price</th><th>Avg Close Price</th><th>Liquidation Price</th><th>Direction</th><th>Closing Quantity</th><th>Realised PNL</th><th>Status</th>
+              <th>Spot</th><th>Open Time</th><th>Close Time</th><th>Avg Entry Price</th><th>Avg Close Price</th><th>Direction</th><th>Closing Quantity</th><th>Realised PNL</th><th>Status</th>
             </tr>
           </thead>
           <tbody id="positionsHistory"></tbody>
@@ -134,7 +123,6 @@
             <td>${p.entry ?? ''}</td>
             <td>${p.current ?? ''}</td>
             <td>${p.vol ?? ''}</td>
-            <td>${p.leverage ?? ''}</td>
             <td>${p.tp ?? ''}</td>
             <td>${p.sl ?? ''}</td>
             <td>${p.pnl?.toFixed ? p.pnl.toFixed(6) : p.pnl}</td>
@@ -167,15 +155,13 @@
         const posHistData = await posHistRes.json()
         document.getElementById('positionsHistory').innerHTML = posHistData.map(p => `
           <tr>
-            <td>${p.symbol} Perpetual</td>
+            <td>${p.symbol} Spot</td>
             <td>${p.openTime ? new Date(p.openTime).toLocaleString() : ''}</td>
             <td>${p.closeTime ? new Date(p.closeTime).toLocaleString() : ''}</td>
-            <td>${p.marginMode}</td>
             <td>${p.entryPrice ?? ''}</td>
             <td>${p.closePrice ?? ''}</td>
-            <td>${p.liquidationPrice ?? '--'}</td>
             <td>${p.direction}</td>
-            <td>${p.closingQuantity ?? ''} USDT</td>
+            <td>${p.closingQuantity ?? ''} ${p.baseCoin || ''}</td>
             <td>${p.realizedPnl ?? ''} USDT ${p.realizedRoi ? `(${p.realizedRoi.toFixed ? p.realizedRoi.toFixed(2) : p.realizedRoi}%)` : ''}</td>
             <td>${p.status}</td>
           </tr>
