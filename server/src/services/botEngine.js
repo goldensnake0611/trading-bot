@@ -71,6 +71,23 @@ export async function startBot({ apiKey, secretKey, symbol, vol, tpPct, slPct, s
   return id
 }
 
+function checkDailyLossLimit(bot) {
+  const limit = Number(process.env.DAILY_LOSS_LIMIT || 10)
+  const today = new Date().setHours(0,0,0,0)
+  
+  // Calculate PnL for trades closed today by this bot
+  const dailyPnl = (bot.history || [])
+    .filter(h => h.side === 'SELL' && h.time >= today)
+    .reduce((sum, h) => sum + (Number(h.pnl) || 0), 0)
+    
+  if (dailyPnl <= -limit) {
+    console.warn(`[${bot.id}] Daily Loss Limit Reached: ${dailyPnl} <= -${limit}. Stopping bot.`)
+    stopBot(bot.id)
+    return true // Limit reached
+  }
+  return false
+}
+
 export function stopBot(id) {
   const bot = bots.get(id)
   if (bot) {
@@ -82,6 +99,9 @@ export function stopBot(id) {
 }
 
 async function strategyTick(bot) {
+  // Check Daily Loss Limit first
+  if (checkDailyLossLimit(bot)) return
+
   const { symbol, apiKey, secretKey, vol, tpPct, slPct, strategy } = bot
   
   // Select strategy module
