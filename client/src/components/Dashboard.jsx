@@ -12,6 +12,7 @@ export default function Dashboard() {
   const [history, setHistory] = useState([])
   const [posHistory, setPosHistory] = useState([])
   const [strategiesList, setStrategiesList] = useState([])
+  const [systemLogs, setSystemLogs] = useState([])
   
   // Form State
   const [symbol, setSymbol] = useState('')
@@ -24,15 +25,26 @@ export default function Dashboard() {
     checkBalance()
     fetchStrategies()
     const interval = setInterval(() => {
+      refreshSystemLogs()
       if (activeTab === 'trading') refreshTrading()
       else refreshHistory()
     }, 5000)
     
     // Initial load
     refreshTrading()
+    refreshSystemLogs()
     
     return () => clearInterval(interval)
   }, [activeTab])
+
+  async function refreshSystemLogs() {
+    try {
+      const res = await fetch('/api/logs')
+      if (res.ok) {
+        setSystemLogs(await res.json())
+      }
+    } catch(e) {}
+  }
 
   async function fetchStrategies() {
     try {
@@ -115,6 +127,12 @@ export default function Dashboard() {
           <button onClick={logout} className="logout-btn">Logout</button>
         </div>
         
+        {systemLogs.length > 0 && (
+          <div style={{ marginBottom: '20px', padding: '10px', background: 'rgba(212, 106, 132, 0.1)', border: '1px solid rgba(212, 106, 132, 0.3)', borderRadius: '8px', color: '#ffb3c1' }}>
+            <strong>System Notification:</strong> {systemLogs[0].message} <small>({new Date(systemLogs[0].time).toLocaleTimeString()})</small>
+          </div>
+        )}
+
         <div className="balance-box">
           <div><strong>Balance:</strong> {balance}</div>
           <button 

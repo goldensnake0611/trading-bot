@@ -22,5 +22,6 @@ router.get('/positions_history', tradeController.getPositionsHistory)
 router.get('/balance', tradeController.getBalance)
 router.get('/contracts', tradeController.getContracts)
 router.get('/strategies', tradeController.getStrategies)
+router.get('/logs', tradeController.getLogs)
 
 export default router
