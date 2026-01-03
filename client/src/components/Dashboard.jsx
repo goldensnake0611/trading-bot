@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { Info } from 'lucide-react'
 import SymbolSearch from './SymbolSearch'
+import Pagination from './Pagination'
 
 export default function Dashboard() {
   const { logout } = useAuth()
@@ -17,6 +18,12 @@ export default function Dashboard() {
   const [posHistory, setPosHistory] = useState([])
   const [strategiesList, setStrategiesList] = useState([])
   const [systemLogs, setSystemLogs] = useState([])
+
+  // Pagination State
+  const [posHistoryPage, setPosHistoryPage] = useState(1)
+  const [posHistoryLimit, setPosHistoryLimit] = useState(10)
+  const [historyPage, setHistoryPage] = useState(1)
+  const [historyLimit, setHistoryLimit] = useState(10)
   
   // Form State
   const [symbol, setSymbol] = useState('')
@@ -384,30 +391,42 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {posHistory.map((p, i) => (
-                    <tr 
-                      key={i}
-                      onClick={(e) => handleHistoryRowClick(e, i)}
-                      style={{ 
-                        cursor: 'pointer',
-                        backgroundColor: selectedHistoryIndices.has(i) ? 'rgba(255, 255, 255, 0.1)' : 'transparent' 
-                      }}
-                    >
-                      <td>{p.symbol} Spot</td>
-                      <td>{p.strategy}</td>
-                      <td>{p.openTime ? new Date(p.openTime).toLocaleString() : ''}</td>
-                      <td>{p.closeTime ? new Date(p.closeTime).toLocaleString() : ''}</td>
-                      <td>{p.entryPrice}</td>
-                      <td>{p.closePrice}</td>
-                      <td>{p.direction}</td>
-                      <td>{p.closingQuantity} {p.baseCoin}</td>
-                      <td>{p.realizedPnl} {p.realizedRoi ? `(${Number(p.realizedRoi).toFixed(2)}%)` : ''}</td>
-                      <td>{p.status}</td>
-                    </tr>
-                  ))}
+                  {posHistory
+                    .slice((posHistoryPage - 1) * posHistoryLimit, posHistoryPage * posHistoryLimit)
+                    .map((p, i) => {
+                      const absIndex = (posHistoryPage - 1) * posHistoryLimit + i
+                      return (
+                        <tr 
+                          key={absIndex}
+                          onClick={(e) => handleHistoryRowClick(e, absIndex)}
+                          style={{ 
+                            cursor: 'pointer',
+                            backgroundColor: selectedHistoryIndices.has(absIndex) ? 'rgba(255, 255, 255, 0.1)' : 'transparent' 
+                          }}
+                        >
+                          <td>{p.symbol} Spot</td>
+                          <td>{p.strategy}</td>
+                          <td>{p.openTime ? new Date(p.openTime).toLocaleString() : ''}</td>
+                          <td>{p.closeTime ? new Date(p.closeTime).toLocaleString() : ''}</td>
+                          <td>{p.entryPrice}</td>
+                          <td>{p.closePrice}</td>
+                          <td>{p.direction}</td>
+                          <td>{p.closingQuantity} {p.baseCoin}</td>
+                          <td>{p.realizedPnl} {p.realizedRoi ? `(${Number(p.realizedRoi).toFixed(2)}%)` : ''}</td>
+                          <td>{p.status}</td>
+                        </tr>
+                      )
+                    })}
                 </tbody>
               </table>
             </div>
+            <Pagination 
+              currentPage={posHistoryPage}
+              totalItems={posHistory.length}
+              pageSize={posHistoryLimit}
+              onPageChange={setPosHistoryPage}
+              onPageSizeChange={setPosHistoryLimit}
+            />
 
             <h2>Order History</h2>
             <div className="table-wrapper">
@@ -418,30 +437,42 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {history.map((h, i) => (
-                    <tr 
-                      key={i}
-                      onClick={(e) => handleOrderRowClick(e, i)}
-                      style={{ 
-                        cursor: 'pointer',
-                        backgroundColor: selectedOrderIndices.has(i) ? 'rgba(255, 255, 255, 0.1)' : 'transparent' 
-                      }}
-                    >
-                      <td>{new Date(h.time).toLocaleString()}</td>
-                      <td>{h.botId}</td>
-                      <td>{h.symbol}</td>
-                      <td>{h.side}</td>
-                      <td>{h.price}</td>
-                      <td>{h.vol}</td>
-                      <td>{h.status}</td>
-                      <td>{h.event}</td>
-                      <td>{h.pnl}</td>
-                      <td>{h.roi}</td>
-                    </tr>
-                  ))}
+                  {history
+                    .slice((historyPage - 1) * historyLimit, historyPage * historyLimit)
+                    .map((h, i) => {
+                      const absIndex = (historyPage - 1) * historyLimit + i
+                      return (
+                        <tr 
+                          key={absIndex}
+                          onClick={(e) => handleOrderRowClick(e, absIndex)}
+                          style={{ 
+                            cursor: 'pointer',
+                            backgroundColor: selectedOrderIndices.has(absIndex) ? 'rgba(255, 255, 255, 0.1)' : 'transparent' 
+                          }}
+                        >
+                          <td>{new Date(h.time).toLocaleString()}</td>
+                          <td>{h.botId}</td>
+                          <td>{h.symbol}</td>
+                          <td>{h.side}</td>
+                          <td>{h.price}</td>
+                          <td>{h.vol}</td>
+                          <td>{h.status}</td>
+                          <td>{h.event}</td>
+                          <td>{h.pnl}</td>
+                          <td>{h.roi}</td>
+                        </tr>
+                      )
+                    })}
                 </tbody>
               </table>
             </div>
+            <Pagination 
+              currentPage={historyPage}
+              totalItems={history.length}
+              pageSize={historyLimit}
+              onPageChange={setHistoryPage}
+              onPageSizeChange={setHistoryLimit}
+            />
           </div>
         )}
       </div>
