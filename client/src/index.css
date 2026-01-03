@@ -15,7 +15,7 @@ body {
 
 #root { width: 100%; }
 
-.container { width: 100%; max-width: 900px; padding: 20px; margin: 0 auto; }
+.container { width: 100%; max-width: 1400px; padding: 20px; margin: 0 auto; }
 .card { 
   background: rgba(30, 30, 46, 0.95);
   border-radius: 24px;

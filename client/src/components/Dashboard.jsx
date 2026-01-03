@@ -319,8 +319,7 @@ export default function Dashboard() {
               </button>
             </div>
 
-            <h2>Status</h2>
-            <pre>{JSON.stringify(status, null, 2)}</pre>
+
 
             <h2>Positions</h2>
             <div className="table-wrapper">

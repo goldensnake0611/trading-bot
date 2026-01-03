@@ -26,7 +26,9 @@ export default function SymbolSearch({ value, onChange }) {
 
   const filtered = contracts.filter(c => c.symbol.includes(query.toUpperCase())).slice(0, 100)
 
-  const handleSelect = (symbol) => {
+  const handleSelect = (symbol, e) => {
+    e.preventDefault()
+    e.stopPropagation()
     setQuery(symbol)
     onChange(symbol)
     setIsOpen(false)
@@ -55,7 +57,7 @@ export default function SymbolSearch({ value, onChange }) {
             <div 
               key={c.symbol} 
               className="dropdown-item" 
-              onClick={() => handleSelect(c.symbol)}
+              onClick={(e) => handleSelect(c.symbol, e)}
             >
               {c.baseCoin || c.symbol}/{c.quoteCoin || ''}
             </div>
