@@ -1,17 +1,17 @@
 import { ema } from '../utils/math.js'
 
 export const name = 'EMA Crossover'
-export const description = 'Buy when EMA20 > EMA50 and Price > EMA20. Sell when EMA20 < EMA50.'
+export const description = 'Buy when EMA10 > EMA20 and Price > EMA10. Sell when EMA10 < EMA20 or Price < EMA20.'
 
 export function analyze(closes) {
-  if (closes.length < 60) return { action: 'HOLD' }
+  if (closes.length < 30) return { action: 'HOLD' }
 
   const price = closes.at(-1)
+  const ema10 = ema(closes.slice(-60), 10)
   const ema20 = ema(closes.slice(-60), 20)
-  const ema50 = ema(closes.slice(-60), 50)
 
-  const shouldBuy = ema20 > ema50 && price > ema20
-  const shouldSell = ema20 < ema50 // Cross back down
+  const shouldBuy = ema10 > ema20 && price > ema10
+  const shouldSell = ema10 < ema20 || price < ema20
 
   let action = 'HOLD'
   if (shouldBuy) action = 'BUY'
@@ -20,8 +20,8 @@ export function analyze(closes) {
   return {
     action,
     indicators: {
+      ema10,
       ema20,
-      ema50,
       price
     }
   }
