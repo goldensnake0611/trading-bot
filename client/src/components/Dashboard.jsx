@@ -28,6 +28,7 @@ export default function Dashboard() {
   // Form State
   const [symbol, setSymbol] = useState('')
   const [strategy, setStrategy] = useState('trend-following')
+  const [historyStrategyFilter, setHistoryStrategyFilter] = useState('All')
   const [vol, setVol] = useState(10)
   const [tpPct, setTpPct] = useState(1)
   const [slPct, setSlPct] = useState(0.5)
@@ -217,6 +218,22 @@ export default function Dashboard() {
     }
   }
 
+  const filteredPosHistory = historyStrategyFilter === 'All' 
+    ? posHistory 
+    : posHistory.filter(p => p.strategy === historyStrategyFilter)
+
+  const historyStats = filteredPosHistory.reduce((acc, p) => {
+    const pnl = Number(p.realizedPnl) || 0
+    acc.totalPnl += pnl
+    if (pnl > 0) acc.wins++
+    else acc.losses++
+    return acc
+  }, { totalPnl: 0, wins: 0, losses: 0 })
+
+  const winRate = historyStats.wins + historyStats.losses > 0 
+    ? ((historyStats.wins / (historyStats.wins + historyStats.losses)) * 100).toFixed(1) 
+    : 0
+
   return (
     <div className="container">
       <div className="card">
@@ -383,6 +400,66 @@ export default function Dashboard() {
         ) : (
           <div>
             <h2>Position History</h2>
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              marginBottom: '15px',
+              padding: '15px',
+              background: '#161822',
+              borderRadius: '8px',
+              border: '1px solid #2a2d3d'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ color: '#888', fontSize: '14px' }}>Filter by Strategy:</span>
+                <select 
+                  value={historyStrategyFilter} 
+                  onChange={(e) => {
+                    setHistoryStrategyFilter(e.target.value)
+                    setPosHistoryPage(1)
+                  }}
+                  style={{ 
+                    padding: '8px 12px', 
+                    borderRadius: '4px', 
+                    background: '#1e2030', 
+                    color: 'white', 
+                    border: '1px solid #333',
+                    minWidth: '200px'
+                  }}
+                >
+                  <option value="All">All Strategies</option>
+                  {strategiesList.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div style={{ 
+                display: 'flex', 
+                gap: '30px', 
+                fontSize: '15px', 
+                alignItems: 'center'
+              }}>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ color: '#888', fontSize: '12px', marginBottom: '2px' }}>Total PnL</span>
+                  <span style={{ color: historyStats.totalPnl >= 0 ? '#4caf50' : '#ff4d4d', fontWeight: 'bold' }}>
+                    {historyStats.totalPnl.toFixed(4)} USDT
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ color: '#888', fontSize: '12px', marginBottom: '2px' }}>Wins</span>
+                  <span style={{ color: '#4caf50', fontWeight: 'bold' }}>{historyStats.wins}</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ color: '#888', fontSize: '12px', marginBottom: '2px' }}>Losses</span>
+                  <span style={{ color: '#ff4d4d', fontWeight: 'bold' }}>{historyStats.losses}</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ color: '#888', fontSize: '12px', marginBottom: '2px' }}>Win Rate</span>
+                  <span style={{ fontWeight: 'bold' }}>{winRate}%</span>
+                </div>
+              </div>
+            </div>
             <div className="table-wrapper">
               <table>
                 <thead>
@@ -391,7 +468,7 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {posHistory
+                  {filteredPosHistory
                     .slice((posHistoryPage - 1) * posHistoryLimit, posHistoryPage * posHistoryLimit)
                     .map((p, i) => {
                       const absIndex = (posHistoryPage - 1) * posHistoryLimit + i
@@ -422,7 +499,7 @@ export default function Dashboard() {
             </div>
             <Pagination 
               currentPage={posHistoryPage}
-              totalItems={posHistory.length}
+              totalItems={filteredPosHistory.length}
               pageSize={posHistoryLimit}
               onPageChange={setPosHistoryPage}
               onPageSizeChange={setPosHistoryLimit}
