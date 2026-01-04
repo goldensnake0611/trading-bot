@@ -3,7 +3,7 @@ import * as botEngine from '../services/botEngine.js'
 
 export async function startBot(req, res) {
   console.log('Received start request:', req.body)
-  const { apiKey, apiSecret, symbol, vol, tpPct, slPct, strategy, isPaperTrading } = req.body
+  const { apiKey, apiSecret, symbol, vol, tpPct, slPct, strategy, autoSell, isPaperTrading } = req.body
   const resolvedKey = apiKey || process.env.MEXC_API_KEY
   const resolvedSecret = apiSecret || process.env.MEXC_API_SECRET
   
@@ -20,6 +20,7 @@ export async function startBot(req, res) {
     tpPct,
     slPct, 
     strategy,
+    autoSell,
     isPaperTrading
   })
   
@@ -41,6 +42,12 @@ export async function sellPosition(req, res) {
     console.error('Manual sell failed:', e)
     return res.status(400).json({ error: e.message })
   }
+}
+
+export async function toggleAutoSell(req, res) {
+  const { id, enabled } = req.body
+  const result = botEngine.toggleAutoSell(id, enabled)
+  return res.json({ success: result })
 }
 
 export function getStatus(req, res) {
@@ -68,6 +75,7 @@ export function getPositions(req, res) {
       id: b.id,
       symbol: b.symbol,
       strategy: b.strategy,
+      autoSell: b.autoSell,
       side: b.positionSide,
       entry: b.entry,
       current: b.lastPrice,

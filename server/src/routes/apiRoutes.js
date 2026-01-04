@@ -16,6 +16,7 @@ router.use(requireAuth) // Apply auth middleware to all routes below
 router.post('/start', tradeController.startBot)
 router.post('/stop', tradeController.stopBot)
 router.post('/sell', tradeController.sellPosition)
+router.post('/toggle_autosell', tradeController.toggleAutoSell)
 router.get('/status', tradeController.getStatus)
 router.get('/positions', tradeController.getPositions)
 router.get('/history', tradeController.getHistory)

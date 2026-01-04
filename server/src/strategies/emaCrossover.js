@@ -9,9 +9,10 @@ export function analyze(closes) {
   const price = closes.at(-1)
   const ema10 = ema(closes.slice(-60), 10)
   const ema20 = ema(closes.slice(-60), 20)
+  const ema50 = ema(closes.slice(-60), 50)
 
   const shouldBuy = ema10 > ema20 && price > ema10
-  const shouldSell = ema10 < ema20 || price < ema20
+  const shouldSell = ema20 < ema50 || price < ema20
 
   let action = 'HOLD'
   if (shouldBuy) action = 'BUY'

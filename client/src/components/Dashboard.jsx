@@ -32,6 +32,7 @@ export default function Dashboard() {
   const [vol, setVol] = useState(10)
   const [tpPct, setTpPct] = useState(1)
   const [slPct, setSlPct] = useState(0.5)
+  const [autoSell, setAutoSell] = useState(true)
   const [isPaperTrading, setIsPaperTrading] = useState(false)
 
   useEffect(() => {
@@ -115,7 +116,7 @@ export default function Dashboard() {
     await fetch('/api/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ symbol, vol, tpPct, slPct, strategy, isPaperTrading })
+      body: JSON.stringify({ symbol, vol, tpPct, slPct, strategy, autoSell, isPaperTrading })
     })
     refreshTrading()
   }
@@ -147,6 +148,21 @@ export default function Dashboard() {
       }
     } catch (e) {
       alert('Network error')
+    }
+  }
+
+  async function toggleAutoSell(id, enabled) {
+    try {
+      const res = await fetch('/api/toggle_autosell', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, enabled })
+      })
+      if (res.ok) {
+        refreshTrading()
+      }
+    } catch(e) {
+      console.error(e)
     }
   }
 
@@ -326,6 +342,19 @@ export default function Dashboard() {
             <div style={{ margin: '15px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <input 
                 type="checkbox" 
+                id="auto-sell" 
+                checked={autoSell} 
+                onChange={e => setAutoSell(e.target.checked)} 
+                style={{ width: 'auto', margin: 0 }}
+              />
+              <label htmlFor="auto-sell" style={{ margin: 0, fontWeight: 'normal', cursor: 'pointer' }}>
+                Auto Sell (Strategy Exit)
+              </label>
+            </div>
+
+            <div style={{ margin: '15px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <input 
+                type="checkbox" 
                 id="paper-trading" 
                 checked={isPaperTrading} 
                 onChange={e => setIsPaperTrading(e.target.checked)} 
@@ -375,20 +404,30 @@ export default function Dashboard() {
                       <td>{p.roi?.toFixed ? p.roi.toFixed(4) : p.roi}</td>
                       <td>
                         {p.side && (
-                          <button 
-                            onClick={() => manualSell(p.id)}
-                            style={{
-                              padding: '4px 8px',
-                              fontSize: '12px',
-                              background: '#ff4d4d',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '4px',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            Sell
-                          </button>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <button 
+                              onClick={() => manualSell(p.id)}
+                              style={{
+                                padding: '4px 8px',
+                                fontSize: '12px',
+                                background: '#ff4d4d',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Sell
+                            </button>
+                            <input 
+                              type="checkbox" 
+                              checked={!!p.autoSell}
+                              onChange={(e) => toggleAutoSell(p.id, e.target.checked)}
+                              title="Toggle Auto Sell (TP/SL/Strategy)"
+                              onClick={(e) => e.stopPropagation()}
+                              style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                            />
+                          </div>
                         )}
                       </td>
                     </tr>

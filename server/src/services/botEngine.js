@@ -1,5 +1,8 @@
 import { fetchKlines, placeOrder } from './mexcService.js'
 import { computePnl } from '../utils/math.js'
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
 
 // Import Strategies
 import * as emaCrossover from '../strategies/emaCrossover.js'
@@ -26,11 +29,43 @@ export function getAvailableStrategies() {
 
 // In-memory state
 const bots = new Map()
-const positionsHistory = []
+let positionsHistory = []
 const systemLogs = []
 
+// Persistence
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+const DATA_FILE = path.join(__dirname, '../../data/positions.json')
+
+// Load history
+try {
+  if (fs.existsSync(DATA_FILE)) {
+    positionsHistory = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'))
+    console.log(`Loaded ${positionsHistory.length} positions from history.`)
+  }
+} catch(e) { console.error('Failed to load history:', e) }
+
+function saveHistory() {
+  try {
+    fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true })
+    fs.writeFileSync(DATA_FILE, JSON.stringify(positionsHistory, null, 2))
+  } catch(e) { console.error('Failed to save history:', e) }
+}
+
 export function getBots() {
-  return [...bots.values()]
+  return [...bots.values()].map(bot => ({
+    ...bot,
+    timer: undefined // Remove circular ref/internal obj
+  }))
+}
+
+export function toggleAutoSell(id, enabled) {
+  const bot = bots.get(id)
+  if (bot) {
+    bot.autoSell = !!enabled
+    return true
+  }
+  return false
 }
 
 export function getSystemLogs() {
@@ -46,13 +81,16 @@ export function getPositionsHistory() {
 }
 
 export function getDailyPnl() {
-  const today = new Date().setHours(0,0,0,0)
+  const now = new Date()
+  // Use UTC for daily boundaries to be consistent
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+  
   return positionsHistory
     .filter(p => p.closeTime && p.closeTime >= today)
     .reduce((sum, p) => sum + (Number(p.realizedPnl) || 0), 0)
 }
 
-export async function startBot({ apiKey, secretKey, symbol, vol, tpPct, slPct, strategy, isPaperTrading }) {
+export async function startBot({ apiKey, secretKey, symbol, vol, tpPct, slPct, strategy, autoSell, isPaperTrading }) {
   const id = `${symbol}:${Date.now()}`
   console.log('Starting bot with ID:', id, 'Strategy:', strategy, 'Mode:', isPaperTrading ? 'Paper Trading' : 'Live')
   
@@ -65,6 +103,7 @@ export async function startBot({ apiKey, secretKey, symbol, vol, tpPct, slPct, s
     tpPct: Number(tpPct || 1),
     slPct: Number(slPct || 0.5),
     strategy: strategy || 'trend-following', // Default
+    autoSell: autoSell !== undefined ? !!autoSell : true,
     isPaperTrading: !!isPaperTrading,
     timer: null,
     lastOrder: null,
@@ -86,7 +125,8 @@ export async function startBot({ apiKey, secretKey, symbol, vol, tpPct, slPct, s
 
 async function checkDailyLossLimit(bot) {
   const limit = Number(process.env.DAILY_LOSS_LIMIT || 10)
-  const today = new Date().setHours(0,0,0,0)
+  const now = new Date()
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
   
   // Calculate PnL for trades closed today by this bot
   const dailyPnl = (bot.history || [])
@@ -211,8 +251,9 @@ async function executeSell(bot, reason) {
       pos.realizedRoi = roi
       pos.status = (res.status === 200 && !res.data.code) ? 'Closed' : `Error (${res.status})`
     }
+    saveHistory()
   }
-  
+
   // Reset position
   bot.positionSide = null
   bot.entry = null
@@ -350,17 +391,24 @@ async function strategyTick(bot) {
       status: 'Opened'
     }
     positionsHistory.push(pos)
+    saveHistory()
     bot.currentPositionIndex = positionsHistory.length - 1
     return
   }
 
   // If holding, check TP/SL or Strategy SELL
   if (bot.positionSide === 'long') {
+    // If autoSell is disabled, do not sell automatically (TP/SL/Strategy)
+    if (!bot.autoSell) return
+
     const hitTp = price >= bot.tp
     const hitSl = price <= bot.sl
     const strategySell = action === 'SELL'
     
-    if (hitTp || hitSl || strategySell) {
+    // Check if auto-sell is enabled for strategy signals
+    const shouldSell = hitTp || hitSl || strategySell
+
+    if (shouldSell) {
       let reason = 'Strategy'
       if (hitTp) reason = 'TP'
       else if (hitSl) reason = 'SL'
