@@ -194,20 +194,25 @@ export function deletePositionHistory(id) {
 }
 
 export function deleteAllHistory() {
-  // Keep only active/opened positions
   const initialLen = positionsHistory.length
-  positionsHistory = positionsHistory.filter(p => p.status === 'Opened')
   
-  if (positionsHistory.length !== initialLen) {
-    saveHistory()
-  }
+  // Clear all history, including Opened
+  positionsHistory = []
+  saveHistory()
 
-  // Clear in-memory order history for all bots
+  // Reset all active bots
   for (const bot of bots.values()) {
     bot.history = []
+    bot.positionSide = null
+    bot.entry = null
+    bot.tp = null
+    bot.sl = null
+    bot.heldVol = null
+    bot.currentPositionId = null
+    bot.lastOrder = null
   }
 
-  return { success: true, count: initialLen - positionsHistory.length }
+  return { success: true, count: initialLen }
 }
 
 export async function startBot({ apiKey, secretKey, symbol, vol, tpPct, slPct, strategy, autoSell, isPaperTrading, immediate }) {
@@ -447,28 +452,51 @@ async function executeSell(bot, reason) {
   let rawQty = bot.heldVol || (vol / entry)
   
   // Verify with actual wallet balance if possible
-  if (baseAsset) {
-      try {
-          const account = await fetchAccountInfo(apiKey, secretKey)
-          if (account.status === 200 && account.data.balances) {
-              const bal = account.data.balances.find(b => b.asset === baseAsset)
-              if (bal) {
-                  const free = Number(bal.free)
-                  if (free < rawQty) {
-                      console.warn(`[${bot.id}] Adjusting sell qty from ${rawQty} to available balance ${free} (likely fees)`)
-                      rawQty = free
+          if (baseAsset) {
+              try {
+                  const account = await fetchAccountInfo(apiKey, secretKey)
+                  if (account.status === 200 && account.data.balances) {
+                      const bal = account.data.balances.find(b => b.asset === baseAsset)
+                      if (bal) {
+                          const free = Number(bal.free)
+                          // ALWAYS use available wallet balance for SELL to ensure we close the position fully.
+                          // The calculated rawQty (vol/price) is inaccurate if price changed (profit/loss).
+                          if (free > 0) {
+                              console.log(`[${bot.id}] Using wallet balance ${free} ${baseAsset} for SELL (Calculated was: ${rawQty})`)
+                              rawQty = free
+                          }
+                      }
                   }
+              } catch (e) {
+                  console.error(`[${bot.id}] Failed to check balance before sell:`, e)
               }
           }
-      } catch (e) {
-          console.error(`[${bot.id}] Failed to check balance before sell:`, e)
-      }
-  }
-  
+
   // Truncate to precision
   const factor = Math.pow(10, precision)
   const quantityToSell = Math.floor(rawQty * factor) / factor
   
+  console.log(`[${bot.id}] Sell Logic: Symbol=${symbol}, Raw=${rawQty}, Precision=${precision}, Final=${quantityToSell}, Base=${baseAsset || '?'}`)
+
+  if (quantityToSell <= 0) {
+      const msg = `SELL Failed: Quantity ${quantityToSell} is too small (Raw: ${rawQty}, Precision: ${precision})`
+      console.error(`[${bot.id}] ${msg}`)
+      updateBotHistory(bot, { 
+          exitPrice: currentPrice, 
+          exitTime: new Date().toISOString(),
+          pnl: 0, 
+          roi: 0,
+          status: 'ERROR',
+          error: msg
+      })
+      // Reset bot state to allow manual retry or deletion
+      // But maybe we should keep it open?
+      // If we error out, the user sees "ERROR" in history?
+      // The user wants to "remove history" anyway.
+      // Let's just return to avoid API 400.
+      return { status: 400, data: { msg } }
+  }
+
   let res
   if (bot.isPaperTrading) {
     console.log(`[${bot.id}] Simulating SELL of ${quantityToSell} ${symbol} at ${price}`)

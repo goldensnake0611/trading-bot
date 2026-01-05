@@ -36,21 +36,32 @@ export async function fetchKlines(symbol, interval = '1m', limit = 300, startTim
   return data
 }
 
+let exchangeInfoCache = null
+let exchangeInfoTime = 0
+
 export async function fetchExchangeInfo() {
+  const now = Date.now()
+  if (exchangeInfoCache && (now - exchangeInfoTime < 3600000)) { // 1 hour cache
+      return exchangeInfoCache
+  }
+
   try {
     const url = 'https://api.mexc.com/api/v3/exchangeInfo'
     const res = await fetch(url)
     const json = await res.json().catch(() => null)
-    if (!json || !json.symbols) return []
-    return json.symbols.map(s => ({
+    if (!json || !json.symbols) return exchangeInfoCache || []
+    
+    exchangeInfoCache = json.symbols.map(s => ({
       symbol: s.symbol,
       baseCoin: s.baseAsset,
       quoteCoin: s.quoteAsset,
       baseSizePrecision: s.baseSizePrecision, // Quantity precision (decimal places)
       quoteAmountPrecision: s.quoteAmountPrecision // Quote quantity precision
     }))
+    exchangeInfoTime = now
+    return exchangeInfoCache
   } catch {
-    return [
+    return exchangeInfoCache || [
       { symbol: 'BTCUSDT', baseCoin: 'BTC', quoteCoin: 'USDT' },
       { symbol: 'ETHUSDT', baseCoin: 'ETH', quoteCoin: 'USDT' }
     ]
