@@ -26,8 +26,11 @@ export async function placeOrder({ apiKey, secretKey, symbol, side, type = 'MARK
   return { status: res.status, data }
 }
 
-export async function fetchKlines(symbol, interval = '1m', limit = 300) {
-  const url = `https://api.mexc.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`
+export async function fetchKlines(symbol, interval = '1m', limit = 300, startTime = null, endTime = null) {
+  let url = `https://api.mexc.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`
+  if (startTime) url += `&startTime=${startTime}`
+  if (endTime) url += `&endTime=${endTime}`
+  
   const res = await fetch(url)
   const data = await res.json().catch(() => ([]))
   return data

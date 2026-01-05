@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { Info, X } from 'lucide-react'
 import SymbolSearch from './SymbolSearch'
 import Pagination from './Pagination'
-import RsiCalculator from './RsiCalculator'
+import IndicatorAnalyzer from './IndicatorAnalyzer'
 
 function EditPositionModal({ position, onClose, onSave }) {
   const [tp, setTp] = useState(position.tp || '')
@@ -295,6 +295,27 @@ export default function Dashboard() {
     }
   }
 
+  async function handleBulkDelete() {
+    if (confirm('Are you sure you want to delete ALL history? This cannot be undone.')) {
+      try {
+        const res = await fetch('/api/history', { method: 'DELETE' })
+        if (res.ok) {
+          const data = await res.json()
+          alert(`Deleted ${data.count} history entries.`)
+          refreshHistory()
+          setPosHistoryPage(1)
+          setHistoryPage(1)
+        } else {
+          const err = await res.json()
+          alert('Failed to delete history: ' + (err.error || 'Unknown error'))
+        }
+      } catch (e) {
+        console.error(e)
+        alert('Network error')
+      }
+    }
+  }
+
   async function handleHistoryContextMenu(e, position) {
     e.preventDefault()
     if (confirm(`Are you sure you want to delete this history record for ${position.symbol}?`)) {
@@ -492,14 +513,14 @@ export default function Dashboard() {
             History
           </button>
           <button 
-            className={`tab-btn ${activeTab === 'rsi' ? 'active' : ''}`}
-            onClick={() => setActiveTab('rsi')}
+            className={`tab-btn ${activeTab === 'indicator' ? 'active' : ''}`}
+            onClick={() => setActiveTab('indicator')}
           >
-            RSI Calculator
+            Indicator Analyzer
           </button>
         </div>
 
-        {activeTab === 'rsi' && <RsiCalculator />}
+        {activeTab === 'indicator' && <IndicatorAnalyzer />}
 
         {activeTab === 'trading' && (
           <div>
@@ -707,6 +728,19 @@ export default function Dashboard() {
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </select>
+                <button 
+                  onClick={handleBulkDelete}
+                  style={{ 
+                    padding: '8px 12px', 
+                    borderRadius: '4px', 
+                    background: '#1e2030', 
+                    color: '#d46a84', 
+                    border: '1px solid #333',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Remove All History
+                </button>
               </div>
               
               <div style={{ 

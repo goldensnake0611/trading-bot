@@ -57,6 +57,58 @@ try {
   }
 } catch(e) { console.error('Failed to load history:', e) }
 
+// Revive bots for any positions that are still Opened (after a server restart)
+function reviveOpenedPositions() {
+  const apiKey = process.env.MEXC_API_KEY
+  const secretKey = process.env.MEXC_API_SECRET
+  if (!apiKey || !secretKey) {
+    console.warn('Skipping revive: Missing API credentials in environment')
+    return
+  }
+  const opened = positionsHistory.filter(p => p.status === 'Opened')
+  for (const p of opened) {
+    // Avoid duplicating if already tracked
+    const alreadyTracked = [...bots.values()].some(b => b.currentPositionId === p.id)
+    if (alreadyTracked) continue
+    
+    const id = p.botId || `${p.symbol}:revive:${Date.now()}`
+    const bot = {
+      id,
+      apiKey,
+      secretKey,
+      symbol: p.symbol,
+      vol: Number(p.vol || 1),
+      tpPct: 0,
+      slPct: 0,
+      strategy: p.strategy || 'trend-following',
+      autoSell: true,
+      isPaperTrading: !!process.env.PAPER_TRADING,
+      timer: null,
+      lastOrder: null,
+      entry: p.entryPrice || null,
+      tp: null,
+      sl: null,
+      positionSide: 'long',
+      lastPrice: null,
+      history: []
+    }
+    bots.set(id, bot)
+    bot.currentPositionId = p.id
+    // Start strategy loop to keep lastPrice updated and allow manual/auto sell
+    strategyTick(bot).catch(console.error)
+    bot.timer = setInterval(() => strategyTick(bot).catch(console.error), 5000)
+    systemLogs.push({
+      time: Date.now(),
+      type: 'info',
+      message: `Revived open position for ${p.symbol} (posId=${p.id})`,
+      botId: id
+    })
+  }
+}
+
+// Attempt revival on module init
+reviveOpenedPositions()
+
 function saveHistory() {
   try {
     fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true })
@@ -138,6 +190,23 @@ export function deletePositionHistory(id) {
     return { success: true }
   }
   return { success: false, error: 'Position not found' }
+}
+
+export function deleteAllHistory() {
+  // Keep only active/opened positions
+  const initialLen = positionsHistory.length
+  positionsHistory = positionsHistory.filter(p => p.status === 'Opened')
+  
+  if (positionsHistory.length !== initialLen) {
+    saveHistory()
+  }
+
+  // Clear in-memory order history for all bots
+  for (const bot of bots.values()) {
+    bot.history = []
+  }
+
+  return { success: true, count: initialLen - positionsHistory.length }
 }
 
 export async function startBot({ apiKey, secretKey, symbol, vol, tpPct, slPct, strategy, autoSell, isPaperTrading, immediate }) {

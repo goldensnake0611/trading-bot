@@ -130,6 +130,15 @@ export function deletePositionHistory(req, res) {
   }
 }
 
+export function deleteAllHistory(req, res) {
+  const result = botEngine.deleteAllHistory()
+  if (result.success) {
+    res.json({ success: true, count: result.count })
+  } else {
+    res.status(500).json({ error: result.error || 'Failed to delete history' })
+  }
+}
+
 export async function getBalance(req, res) {
   const apiKey = req.query.apiKey || process.env.MEXC_API_KEY
   const secretKey = req.query.apiSecret || process.env.MEXC_API_SECRET
@@ -161,11 +170,11 @@ export function getLogs(req, res) {
 }
 
 export async function getKlines(req, res) {
-  const { symbol, interval, limit } = req.query
+  const { symbol, interval, limit, startTime, endTime } = req.query
   if (!symbol) return res.status(400).json({ error: 'Missing symbol' })
   
   try {
-    const klines = await fetchKlines(symbol, interval || '1m', limit || 500)
+    const klines = await fetchKlines(symbol, interval || '1m', limit || 500, startTime, endTime)
     res.json(klines)
   } catch(e) {
     console.error(e)

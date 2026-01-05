@@ -1,16 +1,16 @@
 import { useState, useEffect, useMemo } from 'react'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Brush, ReferenceLine } from 'recharts'
+import { ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Brush, ReferenceLine } from 'recharts'
 import SymbolSearch from './SymbolSearch'
 
 // Helper to calculate RSI Array
 function calculateRSI(closes, period = 14) {
-  if (closes.length < period) return closes.map(() => null)
+  if (closes.length < period + 1) return closes.map(() => null)
   
   const rsiArray = []
   let gains = 0
   let losses = 0
   
-  // First period
+  // Calculate initial average gain/loss
   for (let i = 1; i <= period; i++) {
     const diff = closes[i] - closes[i - 1]
     if (diff >= 0) gains += diff
@@ -32,13 +32,13 @@ function calculateRSI(closes, period = 14) {
   for (let i = period + 1; i < closes.length; i++) {
     const diff = closes[i] - closes[i - 1]
     
-    let currentGain = 0
-    let currentLoss = 0
-    if (diff >= 0) currentGain = diff
-    else currentLoss = Math.abs(diff)
-    
-    avgGain = (avgGain * (period - 1) + currentGain) / period
-    avgLoss = (avgLoss * (period - 1) + currentLoss) / period
+    if (diff >= 0) {
+      avgGain = (avgGain * (period - 1) + diff) / period
+      avgLoss = (avgLoss * (period - 1)) / period
+    } else {
+      avgGain = (avgGain * (period - 1)) / period
+      avgLoss = (avgLoss * (period - 1) + Math.abs(diff)) / period
+    }
     
     if (avgLoss === 0) {
       rsiArray.push(100)
@@ -51,39 +51,71 @@ function calculateRSI(closes, period = 14) {
   return rsiArray
 }
 
-export default function RsiCalculator() {
-  const [symbol, setSymbol] = useState('BTCUSDT')
-  const [interval, setInterval] = useState('15m')
-  const [period, setPeriod] = useState(14)
+export default function IndicatorAnalyzer() {
+  const [symbol, setSymbol] = useState(localStorage.getItem('analyzer_symbol') || 'BTCUSDT')
+  const [timeframe, setTimeframe] = useState(localStorage.getItem('analyzer_timeframe') || '1d')
+  const [period, setPeriod] = useState(Number(localStorage.getItem('analyzer_period')) || 14)
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(false)
 
-  const intervals = ['1m', '5m', '15m', '30m', '1h', '4h', '1d']
+  // Persist settings
+  useEffect(() => {
+    localStorage.setItem('analyzer_symbol', symbol)
+    localStorage.setItem('analyzer_timeframe', timeframe)
+    localStorage.setItem('analyzer_period', period)
+  }, [symbol, timeframe, period])
+
+  const timeframes = ['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w', '1M']
+  
+  const formatXAxis = (val) => {
+    const d = new Date(val)
+    if (!timeframe) return d.toLocaleTimeString()
+    // For daily/weekly/monthly, show Date. For intraday, show Time.
+    return timeframe.includes('d') || timeframe.includes('w') || timeframe.includes('M') 
+      ? d.toLocaleDateString() 
+      : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  }
 
   useEffect(() => {
     if (!symbol) return
     
-    setLoading(true)
-    fetch(`/api/klines?symbol=${symbol}&interval=${interval}&limit=500`)
-      .then(res => res.json())
-      .then(klines => {
-        if (Array.isArray(klines)) {
-          // MEXC Kline: [time, open, high, low, close, vol, ...]
-          const closes = klines.map(k => Number(k[4]))
-          const rsiValues = calculateRSI(closes, Number(period))
-          
-          const chartData = klines.map((k, i) => ({
-            time: new Date(k[0]).toLocaleString(),
-            price: Number(k[4]),
-            rsi: rsiValues[i] !== null ? Number(rsiValues[i].toFixed(2)) : null
-          }))
-          
-          setData(chartData)
-        }
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false))
-  }, [symbol, interval, period])
+    const fetchData = (isRefresh = false) => {
+      if (!isRefresh) setLoading(true)
+      
+      // Always fetch data from 1 year ago
+      const oneYearAgo = Date.now() - 31536000000
+      let url = `/api/klines?symbol=${symbol}&interval=${timeframe}&startTime=${oneYearAgo}&limit=10000`
+      
+      fetch(url)
+        .then(res => res.json())
+        .then(klines => {
+          if (Array.isArray(klines)) {
+            // MEXC Kline: [time, open, high, low, close, vol, ...]
+            const closes = klines.map(k => Number(k[4]))
+            const rsiValues = calculateRSI(closes, Number(period))
+            
+            const chartData = klines.map((k, i) => ({
+              time: k[0], // Store raw timestamp (number)
+              open: Number(k[1]),
+              high: Number(k[2]),
+              low: Number(k[3]),
+              close: Number(k[4]),
+              price: Number(k[4]), // Keep for legacy/tooltip if needed
+              rsi: rsiValues[i] !== null ? Number(rsiValues[i].toFixed(2)) : null
+            }))
+            
+            setData(chartData)
+          }
+        })
+        .catch(console.error)
+        .finally(() => setLoading(false))
+    }
+
+    fetchData()
+    const intervalId = window.setInterval(() => fetchData(true), 60000) // Refresh every 1m
+
+    return () => clearInterval(intervalId)
+  }, [symbol, timeframe, period])
 
   return (
     <div style={{ padding: '20px', color: '#fff' }}>
@@ -105,8 +137,8 @@ export default function RsiCalculator() {
         <div>
           <label style={{ display: 'block', marginBottom: '8px', color: '#888' }}>Interval</label>
           <select 
-            value={interval} 
-            onChange={e => setInterval(e.target.value)}
+            value={timeframe}
+            onChange={e => setTimeframe(e.target.value)}
             style={{ 
               padding: '10px', 
               borderRadius: '4px', 
@@ -116,7 +148,7 @@ export default function RsiCalculator() {
               minWidth: '100px'
             }}
           >
-            {intervals.map(i => <option key={i} value={i}>{i}</option>)}
+            {timeframes.map(i => <option key={i} value={i}>{i}</option>)}
           </select>
         </div>
 
@@ -146,7 +178,7 @@ export default function RsiCalculator() {
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart
+            <ComposedChart
               data={data}
               margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
             >
@@ -154,19 +186,16 @@ export default function RsiCalculator() {
               <XAxis 
                 dataKey="time" 
                 tick={{ fill: '#888', fontSize: 12 }} 
-                tickFormatter={(val) => {
-                    // Show simpler time on axis, e.g. HH:mm or Date
-                    const d = new Date(val)
-                    return interval.includes('d') ? d.toLocaleDateString() : d.toLocaleTimeString()
-                }}
+                tickFormatter={formatXAxis}
                 minTickGap={50}
               />
               <YAxis yAxisId="rsi" domain={[0, 100]} tick={{ fill: '#888' }} label={{ value: 'RSI', angle: -90, position: 'insideLeft', fill: '#888' }} />
-              <YAxis yAxisId="price" orientation="right" domain={['auto', 'auto']} tick={{ fill: '#888' }} hide />
+              <YAxis yAxisId="price" orientation="right" domain={['auto', 'auto']} tick={{ fill: '#888' }} />
               <Tooltip 
-                contentStyle={{ backgroundColor: '#2a2d3d', border: '1px solid #444' }}
+                contentStyle={{ backgroundColor: '#1e2030', border: '1px solid #444' }}
                 itemStyle={{ color: '#fff' }}
                 labelStyle={{ color: '#888' }}
+                labelFormatter={(label) => new Date(label).toLocaleString()}
               />
               <Legend />
               <ReferenceLine y={70} yAxisId="rsi" stroke="#ff4d4d" strokeDasharray="3 3" label="Overbought (70)" />
@@ -182,19 +211,26 @@ export default function RsiCalculator() {
                 name={`RSI (${period})`}
                 connectNulls
               />
-               {/* Optional: Show Price on secondary axis to correlate */}
-               {/* <Line 
+              
+              <Line 
                 yAxisId="price"
                 type="monotone" 
                 dataKey="price" 
                 stroke="#82ca9d" 
+                strokeWidth={2}
                 dot={false} 
-                alpha={0.3}
                 name="Price"
-              /> */}
+                connectNulls
+              />
               
-              <Brush dataKey="time" height={30} stroke="#8884d8" fill="#1e2030" tickFormatter={() => ''} />
-            </LineChart>
+              <Brush 
+                dataKey="time" 
+                height={30} 
+                stroke="#8884d8" 
+                fill="#1e2030" 
+                tickFormatter={(val) => new Date(val).toLocaleDateString()} 
+              />
+            </ComposedChart>
           </ResponsiveContainer>
         )}
       </div>
