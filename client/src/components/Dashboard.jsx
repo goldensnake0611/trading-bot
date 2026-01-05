@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { Info, X } from 'lucide-react'
 import SymbolSearch from './SymbolSearch'
 import Pagination from './Pagination'
+import RsiCalculator from './RsiCalculator'
 
 function EditPositionModal({ position, onClose, onSave }) {
   const [tp, setTp] = useState(position.tp || '')
@@ -314,6 +315,13 @@ export default function Dashboard() {
     }
   }
 
+  async function handlePositionContextMenu(e, position) {
+    e.preventDefault()
+    if (confirm(`Are you sure you want to STOP the bot for ${position.symbol}? If there is an open position, it will be SOLD immediately.`)) {
+      await stopBot(position.id)
+    }
+  }
+
   // Long press logic
   const handleRowMouseDown = (position) => {
     longPressTimer.current = setTimeout(() => {
@@ -483,9 +491,17 @@ export default function Dashboard() {
           >
             History
           </button>
+          <button 
+            className={`tab-btn ${activeTab === 'rsi' ? 'active' : ''}`}
+            onClick={() => setActiveTab('rsi')}
+          >
+            RSI Calculator
+          </button>
         </div>
 
-        {activeTab === 'trading' ? (
+        {activeTab === 'rsi' && <RsiCalculator />}
+
+        {activeTab === 'trading' && (
           <div>
             <label>
               Symbol
@@ -580,6 +596,7 @@ export default function Dashboard() {
                     <tr 
                       key={p.id} 
                       onClick={(e) => handleRowClick(e, p.id)}
+                      onContextMenu={(e) => handlePositionContextMenu(e, p)}
                       onDoubleClick={() => handleRowDoubleClick(p.symbol)}
                       onMouseDown={() => handleRowMouseDown(p)}
                       onMouseUp={handleRowMouseUp}
@@ -653,7 +670,9 @@ export default function Dashboard() {
               </table>
             </div>
           </div>
-        ) : (
+        )}
+
+        {activeTab === 'history' && (
           <div>
             <h2>Position History</h2>
             <div style={{ 

@@ -1,4 +1,4 @@
-import { fetchAccountInfo, fetchExchangeInfo } from '../services/mexcService.js'
+import { fetchAccountInfo, fetchExchangeInfo, fetchKlines } from '../services/mexcService.js'
 import * as botEngine from '../services/botEngine.js'
 
 export async function startBot(req, res) {
@@ -158,6 +158,19 @@ export function getStrategies(req, res) {
 export function getLogs(req, res) {
   const logs = botEngine.getSystemLogs()
   res.json(logs)
+}
+
+export async function getKlines(req, res) {
+  const { symbol, interval, limit } = req.query
+  if (!symbol) return res.status(400).json({ error: 'Missing symbol' })
+  
+  try {
+    const klines = await fetchKlines(symbol, interval || '1m', limit || 500)
+    res.json(klines)
+  } catch(e) {
+    console.error(e)
+    res.status(500).json({ error: 'Failed to fetch klines' })
+  }
 }
 
 export function getStats(req, res) {

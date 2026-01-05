@@ -9,6 +9,7 @@ import crypto from 'crypto'
 import * as emaCrossover from '../strategies/emaCrossover.js'
 import * as trendFollowing from '../strategies/trendFollowing.js'
 import * as rsiEmaPullback from '../strategies/rsiEmaPullback.js'
+import * as rsiEmaTrendStrategy from '../strategies/rsiEmaTrendStrategy.js'
 import * as vwapScalping from '../strategies/vwapScalping.js'
 import * as dca from '../strategies/dca.js'
 
@@ -16,6 +17,7 @@ const strategies = {
   'ema-crossover': emaCrossover,
   'trend-following': trendFollowing,
   'rsi-ema-pullback': rsiEmaPullback,
+  'rsi-ema-trend': rsiEmaTrendStrategy,
   'vwap-scalping': vwapScalping,
   'dca': dca
 }
