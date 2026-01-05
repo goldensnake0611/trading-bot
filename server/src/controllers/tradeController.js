@@ -3,7 +3,7 @@ import * as botEngine from '../services/botEngine.js'
 
 export async function startBot(req, res) {
   console.log('Received start request:', req.body)
-  const { apiKey, apiSecret, symbol, vol, tpPct, slPct, strategy, autoSell, isPaperTrading } = req.body
+  const { apiKey, apiSecret, symbol, vol, tpPct, slPct, strategy, autoSell, isPaperTrading, immediate } = req.body
   const resolvedKey = apiKey || process.env.MEXC_API_KEY
   const resolvedSecret = apiSecret || process.env.MEXC_API_SECRET
   
@@ -21,7 +21,8 @@ export async function startBot(req, res) {
     slPct, 
     strategy,
     autoSell,
-    isPaperTrading
+    isPaperTrading,
+    immediate
   })
   
   return res.json({ id })
@@ -105,6 +106,16 @@ export function getPositionsHistory(req, res) {
   const history = botEngine.getPositionsHistory()
   const out = history.slice().sort((a,b) => (b.openTime || 0) - (a.openTime || 0))
   res.json(out)
+}
+
+export function deletePositionHistory(req, res) {
+  const { id } = req.params
+  const result = botEngine.deletePositionHistory(id)
+  if (result.success) {
+    res.json({ success: true })
+  } else {
+    res.status(400).json({ error: result.error })
+  }
 }
 
 export async function getBalance(req, res) {

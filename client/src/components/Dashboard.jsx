@@ -212,6 +212,27 @@ export default function Dashboard() {
     refreshTrading()
   }
 
+  async function manualBuy() {
+    if (!symbol) return alert('Please select a symbol')
+    if (!confirm(`Are you sure you want to BUY ${symbol} immediately with ${vol} USDT?`)) return
+    
+    await fetch('/api/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        symbol, 
+        vol, 
+        tpPct, 
+        slPct, 
+        strategy, 
+        autoSell, 
+        isPaperTrading,
+        immediate: true 
+      })
+    })
+    refreshTrading()
+  }
+
   async function stopBot(id) {
     if (!id) return
     await fetch('/api/stop', {
@@ -269,6 +290,26 @@ export default function Dashboard() {
     } catch (e) {
       console.error(e)
       alert('Failed to update TP/SL')
+    }
+  }
+
+  async function handleHistoryContextMenu(e, position) {
+    e.preventDefault()
+    if (confirm(`Are you sure you want to delete this history record for ${position.symbol}?`)) {
+      try {
+        const res = await fetch(`/api/history/${position.id}`, {
+          method: 'DELETE'
+        })
+        if (res.ok) {
+          refreshHistory()
+        } else {
+          const err = await res.json()
+          alert('Failed to delete: ' + (err.error || 'Unknown error'))
+        }
+      } catch (e) {
+        console.error(e)
+        alert('Network error')
+      }
     }
   }
 
@@ -518,6 +559,8 @@ export default function Dashboard() {
 
             <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
               <button onClick={startBot} className="btn-primary">Start Trading</button>
+              <button onClick={manualBuy} className="btn-primary" style={{ background: '#2196f3' }}>Buy Now</button>
+              
               <button onClick={() => stopBot(activeBot?.id)} className="btn-primary btn-stop" disabled={!activeBot}>
                 Stop Bot {activeBot ? `(${activeBot.symbol})` : ''}
               </button>
@@ -672,6 +715,7 @@ export default function Dashboard() {
                         <tr 
                           key={absIndex}
                           onClick={(e) => handleHistoryRowClick(e, absIndex)}
+                          onContextMenu={(e) => handleHistoryContextMenu(e, p)}
                           style={{ 
                             cursor: 'pointer',
                             backgroundColor: selectedHistoryIndices.has(absIndex) ? 'rgba(255, 255, 255, 0.1)' : 'transparent' 

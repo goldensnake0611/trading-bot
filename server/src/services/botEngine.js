@@ -3,6 +3,7 @@ import { computePnl } from '../utils/math.js'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import crypto from 'crypto'
 
 // Import Strategies
 import * as emaCrossover from '../strategies/emaCrossover.js'
@@ -41,6 +42,15 @@ const DATA_FILE = path.join(__dirname, '../../data/positions.json')
 try {
   if (fs.existsSync(DATA_FILE)) {
     positionsHistory = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'))
+    // Backfill IDs
+    let modified = false
+    positionsHistory.forEach(p => {
+      if (!p.id) {
+        p.id = crypto.randomUUID()
+        modified = true
+      }
+    })
+    if (modified) saveHistory()
     console.log(`Loaded ${positionsHistory.length} positions from history.`)
   }
 } catch(e) { console.error('Failed to load history:', e) }
@@ -110,7 +120,25 @@ export function getDailyPnl() {
     .reduce((sum, p) => sum + (Number(p.realizedPnl) || 0), 0)
 }
 
-export async function startBot({ apiKey, secretKey, symbol, vol, tpPct, slPct, strategy, autoSell, isPaperTrading }) {
+export function deletePositionHistory(id) {
+  // Check if any active bot is using this position
+  for (const bot of bots.values()) {
+    if (bot.currentPositionId === id) {
+      return { success: false, error: 'Cannot delete history of an active position.' }
+    }
+  }
+
+  const initialLen = positionsHistory.length
+  positionsHistory = positionsHistory.filter(p => p.id !== id)
+  
+  if (positionsHistory.length !== initialLen) {
+    saveHistory()
+    return { success: true }
+  }
+  return { success: false, error: 'Position not found' }
+}
+
+export async function startBot({ apiKey, secretKey, symbol, vol, tpPct, slPct, strategy, autoSell, isPaperTrading, immediate }) {
   const id = `${symbol}:${Date.now()}`
   console.log('Starting bot with ID:', id, 'Strategy:', strategy, 'Mode:', isPaperTrading ? 'Paper Trading' : 'Live')
   
@@ -136,11 +164,106 @@ export async function startBot({ apiKey, secretKey, symbol, vol, tpPct, slPct, s
   }
   
   bots.set(id, bot)
+
+  if (immediate) {
+      try {
+        const kl = await fetchKlines(symbol, '1m')
+        if (kl && kl.length > 0) {
+            const price = Number(kl.at(-1)[4])
+            await executeBuy(bot, price, { trigger: 'Manual Immediate Buy' })
+        } else {
+            console.error('Failed to fetch price for immediate buy')
+        }
+      } catch (e) {
+        console.error('Immediate buy failed', e)
+      }
+  }
+  
   // Run immediately then interval
   strategyTick(bot).catch(console.error)
   bot.timer = setInterval(() => strategyTick(bot).catch(console.error), 5000)
   
   return id
+}
+
+async function executeBuy(bot, price, indicators) {
+    const { apiKey, secretKey, symbol, vol, tpPct, slPct, strategy, isPaperTrading } = bot
+    const side = 'BUY'
+    const externalOid = `${bot.id}:open:${Date.now()}`
+    
+    let res
+    if (isPaperTrading) {
+      console.log(`[${bot.id}] Simulating BUY of ${vol} USDT of ${symbol} at ~${price}`)
+      const simulatedQty = vol / price
+      res = {
+        status: 200,
+        data: {
+          symbol,
+          orderId: 'sim_buy_' + Date.now(),
+          transactTime: Date.now(),
+          price: price,
+          origQuoteOrderQty: vol,
+          executedQty: simulatedQty,
+          cummulativeQuoteQty: vol,
+          status: 'FILLED',
+          type: 'MARKET',
+          side: 'BUY'
+        }
+      }
+    } else {
+      res = await placeOrder({ apiKey, secretKey, symbol, side, type: 'MARKET', quoteOrderQty: vol })
+    }
+
+    console.log("order status>>>>", res.status)
+    bot.lastOrder = res
+    if (res.status !== 200 || (res.data && res.data.code)) {
+        console.error('Buy Failed:', res.data)
+        return 
+    }
+    
+    let executedQty = 0
+    if (res.data && res.data.executedQty) {
+      executedQty = Number(res.data.executedQty)
+    } else {
+      executedQty = vol / price
+    }
+    
+    bot.heldVol = executedQty
+    bot.entry = price 
+    bot.tp = price * (1 + tpPct/100)
+    bot.sl = price * (1 - slPct/100)
+    bot.positionSide = 'long'
+    
+    bot.history = bot.history || []
+    bot.history.push({
+      time: Date.now(),
+      symbol,
+      side: 'BUY',
+      price,
+      vol: executedQty, 
+      usdtVal: vol,
+      status: res.status,
+      data: res.data,
+      event: 'open',
+      externalOid,
+      indicators
+    })
+    
+    const posId = crypto.randomUUID()
+    const pos = {
+      id: posId,
+      botId: bot.id,
+      symbol,
+      strategy,
+      openTime: Date.now(),
+      entryPrice: price,
+      direction: 'Long',
+      vol: executedQty,
+      status: 'Opened'
+    }
+    positionsHistory.push(pos)
+    saveHistory()
+    bot.currentPositionId = posId
 }
 
 async function checkDailyLossLimit(bot) {
@@ -261,8 +384,8 @@ async function executeSell(bot, reason) {
     reason
   })
   
-  if (typeof bot.currentPositionIndex === 'number') {
-    const pos = positionsHistory[bot.currentPositionIndex]
+  if (bot.currentPositionId) {
+    const pos = positionsHistory.find(p => p.id === bot.currentPositionId)
     if (pos) {
       pos.closeTime = Date.now()
       pos.closePrice = price
@@ -272,6 +395,7 @@ async function executeSell(bot, reason) {
       pos.status = (res.status === 200 && !res.data.code) ? 'Closed' : `Error (${res.status})`
     }
     saveHistory()
+    bot.currentPositionId = null
   }
 
   // Reset position
@@ -330,89 +454,7 @@ async function strategyTick(bot) {
 
   // If no position, check for Buy
   if (!bot.positionSide && action === 'BUY') {
-    const side = 'BUY'
-    const externalOid = `${bot.id}:open:${Date.now()}`
-    // Market buy by quoteOrderQty (USDT amount)
-    // vol is now USDT amount
-    
-    let res
-    if (bot.isPaperTrading) {
-      console.log(`[${bot.id}] Simulating BUY of ${vol} USDT of ${symbol} at ~${price}`)
-      // Simulate successful buy
-      // We need to estimate executedQty based on price
-      const simulatedQty = vol / price
-      res = {
-        status: 200,
-        data: {
-          symbol,
-          orderId: 'sim_buy_' + Date.now(),
-          transactTime: Date.now(),
-          price: price,
-          origQuoteOrderQty: vol,
-          executedQty: simulatedQty,
-          cummulativeQuoteQty: vol,
-          status: 'FILLED',
-          type: 'MARKET',
-          side: 'BUY'
-        }
-      }
-    } else {
-      res = await placeOrder({ apiKey, secretKey, symbol, side, type: 'MARKET', quoteOrderQty: vol })
-    }
-
-    console.log("order status>>>>", res.status)
-    bot.lastOrder = res
-    if (res.status !== 200 || (res.data && res.data.code)) {
-        // Failed
-        console.error('Buy Failed:', res.data)
-        return 
-    }
-    
-    // Determine executed quantity (Base Asset)
-    let executedQty = 0
-    if (res.data && res.data.executedQty) {
-      executedQty = Number(res.data.executedQty)
-    } else {
-      // Fallback for simulation or if API doesn't return immediate fill details
-      executedQty = vol / price
-    }
-    
-    bot.heldVol = executedQty
-
-    // Assume filled at current price for simulation/tracking
-    bot.entry = price 
-    bot.tp = price * (1 + tpPct/100)
-    bot.sl = price * (1 - slPct/100)
-    bot.positionSide = 'long'
-    
-    bot.history = bot.history || []
-    bot.history.push({
-      time: Date.now(),
-      symbol,
-      side: 'BUY',
-      price,
-      vol: executedQty, // Log base asset qty
-      usdtVal: vol,     // Log USDT value
-      status: res.status,
-      data: res.data,
-      event: 'open',
-      externalOid,
-      indicators
-    })
-    
-    const pos = {
-      botId: bot.id,
-      symbol,
-      strategy,
-      openTime: Date.now(),
-      entryPrice: price,
-      direction: 'Long',
-      vol: executedQty,
-      status: 'Opened'
-    }
-    positionsHistory.push(pos)
-    saveHistory()
-    bot.currentPositionIndex = positionsHistory.length - 1
+    await executeBuy(bot, price, indicators)
     return
   }
 
