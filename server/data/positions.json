@@ -708,5 +708,15 @@
     "direction": "Long",
     "vol": 57.70673437590167,
     "status": "Opened"
+  },
+  {
+    "botId": "ATUSDT:1767579691669",
+    "symbol": "ATUSDT",
+    "strategy": "trend-following",
+    "openTime": 1767579691958,
+    "entryPrice": 0.17377,
+    "direction": "Long",
+    "vol": 57.54733268113023,
+    "status": "Opened"
   }
 ]

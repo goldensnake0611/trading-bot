@@ -103,6 +103,29 @@ export default function Dashboard() {
   const [editingPosition, setEditingPosition] = useState(null)
   const longPressTimer = useRef(null)
 
+  // Notification State
+  const [showNotification, setShowNotification] = useState(false)
+  const [lastLogTime, setLastLogTime] = useState(null)
+  const notificationTimer = useRef(null)
+
+  useEffect(() => {
+    if (systemLogs.length > 0) {
+      const latest = systemLogs[0]
+      if (latest.time !== lastLogTime) {
+        setLastLogTime(latest.time)
+        setShowNotification(true)
+        
+        // Clear existing timer
+        if (notificationTimer.current) clearTimeout(notificationTimer.current)
+        
+        // Auto close after 10 seconds
+        notificationTimer.current = setTimeout(() => {
+          setShowNotification(false)
+        }, 10000)
+      }
+    }
+  }, [systemLogs])
+
   useEffect(() => {
     checkBalance()
     fetchStrategies()
@@ -360,9 +383,35 @@ export default function Dashboard() {
           <button onClick={logout} className="logout-btn">Logout</button>
         </div>
         
-        {systemLogs.length > 0 && (
-          <div style={{ marginBottom: '20px', padding: '10px', background: 'rgba(212, 106, 132, 0.1)', border: '1px solid rgba(212, 106, 132, 0.3)', borderRadius: '8px', color: '#ffb3c1' }}>
-            <strong>System Notification:</strong> {systemLogs[0].message} <small>({new Date(systemLogs[0].time).toLocaleTimeString()})</small>
+        {showNotification && systemLogs.length > 0 && (
+          <div style={{ 
+            marginBottom: '20px', 
+            padding: '10px', 
+            background: 'rgba(212, 106, 132, 0.1)', 
+            border: '1px solid rgba(212, 106, 132, 0.3)', 
+            borderRadius: '8px', 
+            color: '#ffb3c1',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <div>
+              <strong>System Notification:</strong> {systemLogs[0].message} <small>({new Date(systemLogs[0].time).toLocaleTimeString()})</small>
+            </div>
+            <button 
+              onClick={() => setShowNotification(false)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#ffb3c1',
+                cursor: 'pointer',
+                padding: '4px',
+                display: 'flex',
+                alignItems: 'center'
+              }}
+            >
+              <X size={18} />
+            </button>
           </div>
         )}
 
