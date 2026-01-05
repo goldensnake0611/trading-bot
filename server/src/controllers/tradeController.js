@@ -45,6 +45,18 @@ export async function sellPosition(req, res) {
   }
 }
 
+export async function manualBuy(req, res) {
+  const { id } = req.body
+  try {
+    const result = await botEngine.manualBuy(id)
+    if (result.success) return res.json({ success: true })
+    return res.status(400).json({ error: result.error || 'Buy failed' })
+  } catch (e) {
+    console.error('Manual buy failed:', e)
+    return res.status(400).json({ error: e.message })
+  }
+}
+
 export async function toggleAutoSell(req, res) {
   const { id, enabled } = req.body
   const result = botEngine.toggleAutoSell(id, enabled)

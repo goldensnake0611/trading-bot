@@ -212,25 +212,26 @@ export default function Dashboard() {
     refreshTrading()
   }
 
-  async function manualBuy() {
-    if (!symbol) return alert('Please select a symbol')
-    if (!confirm(`Are you sure you want to BUY ${symbol} immediately with ${vol} USDT?`)) return
-    
-    await fetch('/api/start', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        symbol, 
-        vol, 
-        tpPct, 
-        slPct, 
-        strategy, 
-        autoSell, 
-        isPaperTrading,
-        immediate: true 
+  async function manualBuy(id) {
+    if (!id) return
+    if (!confirm('Are you sure you want to BUY now for this bot?')) return
+    try {
+      const res = await fetch('/api/buy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
       })
-    })
-    refreshTrading()
+      if (res.ok) {
+        alert('Buy order executed successfully')
+        refreshTrading()
+      } else {
+        const err = await res.json()
+        alert('Buy failed: ' + (err.error || 'Unknown error'))
+      }
+    } catch (e) {
+      console.error(e)
+      alert('Network error')
+    }
   }
 
   async function stopBot(id) {
@@ -559,8 +560,6 @@ export default function Dashboard() {
 
             <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
               <button onClick={startBot} className="btn-primary">Start Trading</button>
-              <button onClick={manualBuy} className="btn-primary" style={{ background: '#2196f3' }}>Buy Now</button>
-              
               <button onClick={() => stopBot(activeBot?.id)} className="btn-primary btn-stop" disabled={!activeBot}>
                 Stop Bot {activeBot ? `(${activeBot.symbol})` : ''}
               </button>
@@ -603,32 +602,50 @@ export default function Dashboard() {
                       <td>{p.pnl?.toFixed ? p.pnl.toFixed(6) : p.pnl}</td>
                       <td>{p.roi?.toFixed ? p.roi.toFixed(4) : p.roi}</td>
                       <td>
-                        {p.side && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {!p.side && (
                             <button 
-                              onClick={() => manualSell(p.id)}
+                              onClick={(e) => { e.stopPropagation(); manualBuy(p.id) }}
                               style={{
                                 padding: '4px 8px',
                                 fontSize: '12px',
-                                background: '#ff4d4d',
+                                background: '#2196f3',
                                 color: 'white',
                                 border: 'none',
                                 borderRadius: '4px',
                                 cursor: 'pointer'
                               }}
                             >
-                              Sell
+                              Buy
                             </button>
-                            <input 
-                  type="checkbox" 
-                  checked={!!p.autoSell}
-                  onChange={(e) => toggleAutoSell(p.id, e.target.checked)}
-                  title="Toggle Auto Sell (Strategy Only - TP/SL always active)"
-                  onClick={(e) => e.stopPropagation()}
-                  style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-                />
-                          </div>
-                        )}
+                          )}
+                          {p.side && (
+                            <>
+                              <button 
+                                onClick={() => manualSell(p.id)}
+                                style={{
+                                  padding: '4px 8px',
+                                  fontSize: '12px',
+                                  background: '#ff4d4d',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                Sell
+                              </button>
+                              <input 
+                                type="checkbox" 
+                                checked={!!p.autoSell}
+                                onChange={(e) => toggleAutoSell(p.id, e.target.checked)}
+                                title="Toggle Auto Sell (Strategy Only - TP/SL always active)"
+                                onClick={(e) => e.stopPropagation()}
+                                style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                              />
+                            </>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

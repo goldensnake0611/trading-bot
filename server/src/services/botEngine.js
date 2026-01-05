@@ -263,7 +263,23 @@ async function executeBuy(bot, price, indicators) {
     }
     positionsHistory.push(pos)
     saveHistory()
-    bot.currentPositionId = posId
+  bot.currentPositionId = posId
+}
+
+export async function manualBuy(id) {
+  const bot = bots.get(id)
+  if (!bot) return { success: false, error: 'Bot not found' }
+  if (bot.positionSide) return { success: false, error: 'Position already open' }
+  try {
+    const kl = await fetchKlines(bot.symbol, '1m')
+    if (!kl || kl.length === 0) return { success: false, error: 'Price unavailable' }
+    const price = Number(kl.at(-1)[4])
+    await executeBuy(bot, price, { trigger: 'Manual Buy' })
+    return { success: true }
+  } catch (e) {
+    console.error('Manual buy failed:', e)
+    return { success: false, error: e.message }
+  }
 }
 
 async function checkDailyLossLimit(bot) {
