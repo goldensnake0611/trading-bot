@@ -68,6 +68,26 @@ export function toggleAutoSell(id, enabled) {
   return false
 }
 
+export function updateBotTpSl(id, tp, sl) {
+  const bot = bots.get(id)
+  if (!bot) return false
+  const parseVal = (v) => {
+    if (v === '' || v === null || v === undefined) return null
+    const n = Number(v)
+    return isFinite(n) ? n : null
+  }
+  const newTp = parseVal(tp)
+  const newSl = parseVal(sl)
+  bot.tp = newTp
+  bot.sl = newSl
+  systemLogs.push({
+    time: Date.now(),
+    type: 'info',
+    message: `Updated TP/SL for ${bot.symbol}: TP=${newTp ?? 'Off'}, SL=${newSl ?? 'Off'}`,
+    botId: id
+  })
+  return true
+}
 export function getSystemLogs() {
   return systemLogs.slice(-50).reverse() // Last 50 logs, newest first
 }
@@ -398,21 +418,31 @@ async function strategyTick(bot) {
 
   // If holding, check TP/SL or Strategy SELL
   if (bot.positionSide === 'long') {
-    // If autoSell is disabled, do not sell automatically (TP/SL/Strategy)
-    if (!bot.autoSell) return
-
-    const hitTp = price >= bot.tp
-    const hitSl = price <= bot.sl
+    // Check if auto-sell is enabled for strategy signals
+    // TP and SL are always active if set
+    
+    // Check TP/SL only if they are set (not null/0)
+    const hitTp = (typeof bot.tp === 'number' && bot.tp > 0) && price >= bot.tp
+    const hitSl = (typeof bot.sl === 'number' && bot.sl > 0) && price <= bot.sl
     const strategySell = action === 'SELL'
     
-    // Check if auto-sell is enabled for strategy signals
-    const shouldSell = hitTp || hitSl || strategySell
+    // Determine if we should sell
+    let shouldSell = false
+    let reason = ''
+
+    if (hitTp) {
+      shouldSell = true
+      reason = 'TP'
+    } else if (hitSl) {
+      shouldSell = true
+      reason = 'SL'
+    } else if (bot.autoSell && strategySell) {
+      // Only use strategy sell if autoSell is enabled
+      shouldSell = true
+      reason = 'Strategy'
+    }
 
     if (shouldSell) {
-      let reason = 'Strategy'
-      if (hitTp) reason = 'TP'
-      else if (hitSl) reason = 'SL'
-      
       await executeSell(bot, reason)
     }
   }

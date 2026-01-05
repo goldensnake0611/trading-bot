@@ -50,6 +50,12 @@ export async function toggleAutoSell(req, res) {
   return res.json({ success: result })
 }
 
+export async function updateTpSl(req, res) {
+  const { id, tp, sl } = req.body
+  const result = botEngine.updateBotTpSl(id, tp, sl)
+  return res.json({ success: result })
+}
+
 export function getStatus(req, res) {
   const bots = botEngine.getBots()
   const out = bots.map(b => ({ 

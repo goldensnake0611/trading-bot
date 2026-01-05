@@ -1,8 +1,74 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { Info } from 'lucide-react'
+import { Info, X } from 'lucide-react'
 import SymbolSearch from './SymbolSearch'
 import Pagination from './Pagination'
+
+function EditPositionModal({ position, onClose, onSave }) {
+  const [tp, setTp] = useState(position.tp || '')
+  const [sl, setSl] = useState(position.sl || '')
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    onSave(position.id, tp, sl)
+  }
+
+  return (
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+    }}>
+      <div style={{
+        background: '#1e2030', padding: '20px', borderRadius: '8px', width: '300px', border: '1px solid #444',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <h3>Edit Position: {position.symbol}</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer' }}>
+            <X size={20} />
+          </button>
+        </div>
+        
+        <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: '15px' }}>
+            <label style={{ display: 'block', marginBottom: '5px', color: '#888' }}>Take Profit (TP)</label>
+            <input 
+              type="number" 
+              step="any"
+              value={tp} 
+              onChange={e => setTp(e.target.value)}
+              placeholder="No TP Set"
+              style={{ width: '100%', padding: '8px', background: '#2a2d3d', border: '1px solid #444', color: 'white', borderRadius: '4px' }}
+            />
+          </div>
+          
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'block', marginBottom: '5px', color: '#888' }}>Stop Loss (SL)</label>
+            <input 
+              type="number" 
+              step="any"
+              value={sl} 
+              onChange={e => setSl(e.target.value)}
+              placeholder="No SL Set"
+              style={{ width: '100%', padding: '8px', background: '#2a2d3d', border: '1px solid #444', color: 'white', borderRadius: '4px' }}
+            />
+          </div>
+          
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button type="submit" className="btn-primary" style={{ flex: 1 }}>Update</button>
+            <button 
+              type="button" 
+              onClick={() => { setTp(''); setSl(''); }}
+              style={{ flex: 1, background: '#444', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+            >
+              Clear Both
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
 
 export default function Dashboard() {
   const { logout } = useAuth()
@@ -34,6 +100,8 @@ export default function Dashboard() {
   const [slPct, setSlPct] = useState(0.5)
   const [autoSell, setAutoSell] = useState(true)
   const [isPaperTrading, setIsPaperTrading] = useState(false)
+  const [editingPosition, setEditingPosition] = useState(null)
+  const longPressTimer = useRef(null)
 
   useEffect(() => {
     checkBalance()
@@ -166,12 +234,46 @@ export default function Dashboard() {
     }
   }
 
+  async function handleTpSlUpdate(id, tp, sl) {
+    try {
+      await fetch('/api/update_tp_sl', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, tp, sl })
+      })
+      refreshTrading()
+      setEditingPosition(null)
+    } catch (e) {
+      console.error(e)
+      alert('Failed to update TP/SL')
+    }
+  }
+
+  // Long press logic
+  const handleRowMouseDown = (position) => {
+    longPressTimer.current = setTimeout(() => {
+      setEditingPosition(position)
+    }, 2000) // 2s long press
+  }
+
+  const handleRowMouseUp = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+  }
+
   // Helper to find active bot ID for current symbol (simplified)
   // In reality user might run multiple bots.
   // For the UI buttons "Stop Bot", we need to know which one.
   // The original UI just had a global "stop" that stopped "botId".
   // Let's improve: The "Stop Bot" button will stop the bot for the *selected symbol* if it exists.
   const activeBot = status.find(b => b.symbol === symbol)
+
+  function handleRowDoubleClick(symbol) {
+    const formatted = symbol.endsWith('USDT') ? symbol.replace(/USDT$/, '_USDT') : symbol
+    window.open(`https://www.mexc.com/exchange/${formatted}`, '_blank')
+  }
 
   function handleRowClick(e, id) {
     if (e.ctrlKey || e.metaKey) {
@@ -387,6 +489,12 @@ export default function Dashboard() {
                     <tr 
                       key={p.id} 
                       onClick={(e) => handleRowClick(e, p.id)}
+                      onDoubleClick={() => handleRowDoubleClick(p.symbol)}
+                      onMouseDown={() => handleRowMouseDown(p)}
+                      onMouseUp={handleRowMouseUp}
+                      onMouseLeave={handleRowMouseUp}
+                      onTouchStart={() => handleRowMouseDown(p)}
+                      onTouchEnd={handleRowMouseUp}
                       style={{ 
                         cursor: 'pointer',
                         backgroundColor: selectedPositionIds.has(p.id) ? 'rgba(255, 255, 255, 0.1)' : 'transparent' 
@@ -398,8 +506,8 @@ export default function Dashboard() {
                       <td>{p.entry}</td>
                       <td>{p.current}</td>
                       <td>{p.vol}</td>
-                      <td>{p.tp}</td>
-                      <td>{p.sl}</td>
+                      <td>{p.tp ? Number(p.tp).toFixed(6) : <span style={{color: '#666'}}>Off</span>}</td>
+                      <td>{p.sl ? Number(p.sl).toFixed(6) : <span style={{color: '#666'}}>Off</span>}</td>
                       <td>{p.pnl?.toFixed ? p.pnl.toFixed(6) : p.pnl}</td>
                       <td>{p.roi?.toFixed ? p.roi.toFixed(4) : p.roi}</td>
                       <td>
@@ -420,13 +528,13 @@ export default function Dashboard() {
                               Sell
                             </button>
                             <input 
-                              type="checkbox" 
-                              checked={!!p.autoSell}
-                              onChange={(e) => toggleAutoSell(p.id, e.target.checked)}
-                              title="Toggle Auto Sell (TP/SL/Strategy)"
-                              onClick={(e) => e.stopPropagation()}
-                              style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-                            />
+                  type="checkbox" 
+                  checked={!!p.autoSell}
+                  onChange={(e) => toggleAutoSell(p.id, e.target.checked)}
+                  title="Toggle Auto Sell (Strategy Only - TP/SL always active)"
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                />
                           </div>
                         )}
                       </td>
@@ -592,6 +700,13 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+      {editingPosition && (
+        <EditPositionModal 
+          position={editingPosition} 
+          onClose={() => setEditingPosition(null)} 
+          onSave={handleTpSlUpdate} 
+        />
+      )}
     </div>
   )
 }
