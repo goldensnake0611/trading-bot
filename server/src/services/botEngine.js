@@ -1,4 +1,4 @@
-import { fetchKlines, placeOrder } from './mexcService.js'
+import { fetchKlines, placeOrder, fetchExchangeInfo, fetchAccountInfo } from './mexcService.js'
 import { computePnl } from '../utils/math.js'
 import fs from 'fs'
 import path from 'path'
@@ -65,7 +65,7 @@ function reviveOpenedPositions() {
     console.warn('Skipping revive: Missing API credentials in environment')
     return
   }
-  const opened = positionsHistory.filter(p => p.status === 'Opened')
+  const opened = positionsHistory.filter(p => p.status === 'Opened' || p.status.startsWith('Error'))
   for (const p of opened) {
     // Avoid duplicating if already tracked
     const alreadyTracked = [...bots.values()].some(b => b.currentPositionId === p.id)
@@ -94,6 +94,7 @@ function reviveOpenedPositions() {
     }
     bots.set(id, bot)
     bot.currentPositionId = p.id
+    bot.heldVol = Number(p.vol || 0)
     // Start strategy loop to keep lastPrice updated and allow manual/auto sell
     strategyTick(bot).catch(console.error)
     bot.timer = setInterval(() => strategyTick(bot).catch(console.error), 5000)
@@ -428,8 +429,45 @@ async function executeSell(bot, reason) {
   const side = 'SELL'
   const externalOid = `${bot.id}:close:${Date.now()}`
   
+  // Get symbol precision and base asset info
+  let precision = 2 
+  let baseAsset = null
+  try {
+     const info = await fetchExchangeInfo()
+     const sInfo = info.find(s => s.symbol === symbol)
+     if (sInfo) {
+         if (sInfo.baseSizePrecision !== undefined) {
+             precision = Number(sInfo.baseSizePrecision)
+         }
+         baseAsset = sInfo.baseCoin
+     }
+  } catch(e) { console.error('Exchange info fetch failed:', e) }
+
   // Use heldVol (Base Asset Qty) if available, otherwise estimate from vol (USDT) / entry
-  const quantityToSell = bot.heldVol || (vol / entry)
+  let rawQty = bot.heldVol || (vol / entry)
+  
+  // Verify with actual wallet balance if possible
+  if (baseAsset) {
+      try {
+          const account = await fetchAccountInfo(apiKey, secretKey)
+          if (account.status === 200 && account.data.balances) {
+              const bal = account.data.balances.find(b => b.asset === baseAsset)
+              if (bal) {
+                  const free = Number(bal.free)
+                  if (free < rawQty) {
+                      console.warn(`[${bot.id}] Adjusting sell qty from ${rawQty} to available balance ${free} (likely fees)`)
+                      rawQty = free
+                  }
+              }
+          }
+      } catch (e) {
+          console.error(`[${bot.id}] Failed to check balance before sell:`, e)
+      }
+  }
+  
+  // Truncate to precision
+  const factor = Math.pow(10, precision)
+  const quantityToSell = Math.floor(rawQty * factor) / factor
   
   let res
   if (bot.isPaperTrading) {
@@ -471,26 +509,45 @@ async function executeSell(bot, reason) {
     reason
   })
   
+  const succeeded = (res.status === 200 && !(res.data && res.data.code))
+  
   if (bot.currentPositionId) {
     const pos = positionsHistory.find(p => p.id === bot.currentPositionId)
     if (pos) {
-      pos.closeTime = Date.now()
-      pos.closePrice = price
-      pos.closingQuantity = quantityToSell
-      pos.realizedPnl = pnl
-      pos.realizedRoi = roi
-      pos.status = (res.status === 200 && !res.data.code) ? 'Closed' : `Error (${res.status})`
+      if (succeeded) {
+        pos.closeTime = Date.now()
+        pos.closePrice = price
+        pos.closingQuantity = quantityToSell
+        pos.realizedPnl = pnl
+        pos.realizedRoi = roi
+        pos.status = 'Closed'
+      } else {
+        // Keep status as is (Opened) so it can be retried
+        pos.lastError = `Failed to close at ${new Date().toISOString()}: ${res.status}`
+      }
     }
     saveHistory()
-    bot.currentPositionId = null
+    if (succeeded) {
+      bot.currentPositionId = null
+    }
   }
 
-  // Reset position
-  bot.positionSide = null
-  bot.entry = null
-  bot.tp = null
-  bot.sl = null
-  bot.heldVol = null
+  if (succeeded) {
+    // Reset position only on success
+    bot.positionSide = null
+    bot.entry = null
+    bot.tp = null
+    bot.sl = null
+    bot.heldVol = null
+  } else {
+    // Keep position state; log warning for visibility
+    systemLogs.push({
+      time: Date.now(),
+      type: 'warning',
+      message: `SELL failed for ${symbol}: status ${res.status}${res.data?.code ? ` code ${res.data.code}` : ''}`,
+      botId: bot.id
+    })
+  }
   
   return { success: true, pnl, roi, price }
 }

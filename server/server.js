@@ -1,6 +1,6 @@
+import './src/env.js'
 import express from 'express'
 import path from 'path'
-import dotenv from 'dotenv'
 import session from 'express-session'
 import { fileURLToPath } from 'url'
 import apiRoutes from './src/routes/apiRoutes.js'
@@ -8,7 +8,6 @@ import apiRoutes from './src/routes/apiRoutes.js'
 // Setup environment
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-dotenv.config({ path: path.join(__dirname, '.env') })
 
 const app = express()
 const port = process.env.PORT || 4000

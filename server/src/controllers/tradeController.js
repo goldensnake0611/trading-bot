@@ -85,10 +85,11 @@ export function getStatus(req, res) {
 export function getPositions(req, res) {
   const bots = botEngine.getBots()
   const out = bots.map(b => {
-    const pnl = b.entry && b.lastPrice && b.vol
-      ? (b.lastPrice - b.entry) * b.vol
+    const baseQty = b.heldVol || 0
+    const pnl = b.entry && b.lastPrice && baseQty
+      ? (b.lastPrice - b.entry) * baseQty
       : 0
-    const margin = b.entry && b.vol ? (b.entry * b.vol) : null
+    const margin = b.entry && baseQty ? (b.entry * baseQty) : null
     const roi = margin ? (pnl / margin) * 100 : null
     return {
       id: b.id,
@@ -98,7 +99,7 @@ export function getPositions(req, res) {
       side: b.positionSide,
       entry: b.entry,
       current: b.lastPrice,
-      vol: b.vol,
+      vol: baseQty,
       tp: b.tp,
       sl: b.sl,
       pnl,

@@ -45,7 +45,9 @@ export async function fetchExchangeInfo() {
     return json.symbols.map(s => ({
       symbol: s.symbol,
       baseCoin: s.baseAsset,
-      quoteCoin: s.quoteAsset
+      quoteCoin: s.quoteAsset,
+      baseSizePrecision: s.baseSizePrecision, // Quantity precision (decimal places)
+      quoteAmountPrecision: s.quoteAmountPrecision // Quote quantity precision
     }))
   } catch {
     return [
