@@ -481,19 +481,8 @@ async function executeSell(bot, reason) {
   if (quantityToSell <= 0) {
       const msg = `SELL Failed: Quantity ${quantityToSell} is too small (Raw: ${rawQty}, Precision: ${precision})`
       console.error(`[${bot.id}] ${msg}`)
-      updateBotHistory(bot, { 
-          exitPrice: currentPrice, 
-          exitTime: new Date().toISOString(),
-          pnl: 0, 
-          roi: 0,
-          status: 'ERROR',
-          error: msg
-      })
-      // Reset bot state to allow manual retry or deletion
-      // But maybe we should keep it open?
-      // If we error out, the user sees "ERROR" in history?
-      // The user wants to "remove history" anyway.
-      // Let's just return to avoid API 400.
+      // Log error but keep bot state for now?
+      // Just return error
       return { status: 400, data: { msg } }
   }
 

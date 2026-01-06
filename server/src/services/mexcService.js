@@ -36,6 +36,84 @@ export async function fetchKlines(symbol, interval = '1m', limit = 300, startTim
   return data
 }
 
+export async function fetchFuturesKlines(symbol, interval = '1m', limit = 300, startTime = null, endTime = null) {
+  // Convert Symbol: BTCUSDT -> BTC_USDT
+  const futuresSymbol = symbol.replace('USDT', '_USDT')
+
+  // Map Interval
+  const intervalMap = {
+    '1m': 'Min1',
+    '5m': 'Min5',
+    '15m': 'Min15',
+    '30m': 'Min30',
+    '1h': 'Min60',
+    '4h': 'Hour4',
+    '8h': 'Hour8',
+    '1d': 'Day1',
+    '1w': 'Week1',
+    '1M': 'Month1'
+  }
+  const mappedInterval = intervalMap[interval] || 'Min60'
+
+  let url = `https://contract.mexc.com/api/v1/contract/kline/${futuresSymbol}?interval=${mappedInterval}`
+  
+  // Note: Futures API uses 'start' and 'end' (seconds or ms? usually seconds for unix, but let's check).
+  // The debug output showed timestamps like 1736077200 which is Seconds (10 digits).
+  // JS Date.now() is MS (13 digits).
+  
+  if (startTime) url += `&start=${Math.floor(startTime / 1000)}`
+  if (endTime) url += `&end=${Math.floor(endTime / 1000)}`
+  
+  // Futures API doesn't seem to support 'limit' directly in the same way, but it relies on time range.
+  // However, we can slice the result if needed.
+  
+  try {
+    const res = await fetch(url)
+    const json = await res.json()
+    
+    let result = []
+
+    if (json.success && json.data) {
+       const { time, open, high, low, close, vol } = json.data
+       if (time && Array.isArray(time) && time.length > 0) {
+           // Zip into [[time, open, high, low, close, vol], ...]
+           // Convert time back to MS
+           result = time.map((t, i) => [
+               t * 1000,          // time (ms)
+               open[i],           // open
+               high[i],           // high
+               low[i],            // low
+               close[i],          // close
+               vol[i]             // vol
+           ])
+       }
+    }
+    
+    if (result.length > 0) return result
+    
+    // Fallback: If specific range returns nothing, try fetching latest data (no start/end)
+    // Only if we asked for a specific range
+    if (startTime || endTime) {
+        console.log('Fetch Futures Klines: No data for range, fetching latest...')
+        const fallbackUrl = `https://contract.mexc.com/api/v1/contract/kline/${futuresSymbol}?interval=${mappedInterval}`
+        const res2 = await fetch(fallbackUrl)
+        const json2 = await res2.json()
+        if (json2.success && json2.data) {
+            const { time, open, high, low, close, vol } = json2.data
+            if (!time || !Array.isArray(time)) return []
+            return time.map((t, i) => [
+                t * 1000, open[i], high[i], low[i], close[i], vol[i]
+            ])
+        }
+    }
+    
+    return []
+  } catch (e) {
+    console.error('Fetch Futures Klines Error:', e)
+    return []
+  }
+}
+
 let exchangeInfoCache = null
 let exchangeInfoTime = 0
 

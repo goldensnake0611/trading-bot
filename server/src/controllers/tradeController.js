@@ -1,4 +1,4 @@
-import { fetchAccountInfo, fetchExchangeInfo, fetchKlines } from '../services/mexcService.js'
+import { fetchAccountInfo, fetchExchangeInfo, fetchKlines, fetchFuturesKlines } from '../services/mexcService.js'
 import * as botEngine from '../services/botEngine.js'
 
 export async function startBot(req, res) {
@@ -171,11 +171,16 @@ export function getLogs(req, res) {
 }
 
 export async function getKlines(req, res) {
-  const { symbol, interval, limit, startTime, endTime } = req.query
+  const { symbol, interval, limit, startTime, endTime, type } = req.query
   if (!symbol) return res.status(400).json({ error: 'Missing symbol' })
   
   try {
-    const klines = await fetchKlines(symbol, interval || '1m', limit || 500, startTime, endTime)
+    let klines
+    if (type === 'futures') {
+      klines = await fetchFuturesKlines(symbol, interval || '1m', limit || 500, startTime, endTime)
+    } else {
+      klines = await fetchKlines(symbol, interval || '1m', limit || 500, startTime, endTime)
+    }
     res.json(klines)
   } catch(e) {
     console.error(e)
