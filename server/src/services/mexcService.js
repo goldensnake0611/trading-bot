@@ -27,6 +27,9 @@ export async function placeOrder({ apiKey, secretKey, symbol, side, type = 'MARK
 }
 
 export async function fetchKlines(symbol, interval = '1m', limit = 300, startTime = null, endTime = null) {
+  // Map 1h to 60m for Spot API if needed
+  if (interval === '1h') interval = '60m'
+  
   let url = `https://api.mexc.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`
   if (startTime) url += `&startTime=${startTime}`
   if (endTime) url += `&endTime=${endTime}`
@@ -36,7 +39,7 @@ export async function fetchKlines(symbol, interval = '1m', limit = 300, startTim
   return data
 }
 
-export async function fetchFuturesKlines(symbol, interval = '1m', limit = 300, startTime = null, endTime = null) {
+export async function fetchFuturesKlines(symbol, interval = '5m', limit = 300, startTime = null, endTime = null) {
   // Convert Symbol: BTCUSDT -> BTC_USDT
   const futuresSymbol = symbol.replace('USDT', '_USDT')
 
@@ -117,9 +120,9 @@ export async function fetchFuturesKlines(symbol, interval = '1m', limit = 300, s
 let exchangeInfoCache = null
 let exchangeInfoTime = 0
 
-export async function fetchExchangeInfo() {
+export async function fetchExchangeInfo(force = false) {
   const now = Date.now()
-  if (exchangeInfoCache && (now - exchangeInfoTime < 3600000)) { // 1 hour cache
+  if (!force && exchangeInfoCache && (now - exchangeInfoTime < 3600000)) { // 1 hour cache
       return exchangeInfoCache
   }
 

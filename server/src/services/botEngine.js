@@ -215,9 +215,9 @@ export function deleteAllHistory() {
   return { success: true, count: initialLen }
 }
 
-export async function startBot({ apiKey, secretKey, symbol, vol, tpPct, slPct, strategy, autoSell, isPaperTrading, immediate, marketType }) {
+export async function startBot({ apiKey, secretKey, symbol, vol, tpPct, slPct, strategy, autoSell, isPaperTrading, immediate, marketType, interval }) {
   const id = `${symbol}:${Date.now()}`
-  console.log('Starting bot with ID:', id, 'Strategy:', strategy, 'Mode:', isPaperTrading ? 'Paper Trading' : 'Live', 'Market:', marketType || 'spot')
+  console.log('Starting bot with ID:', id, 'Strategy:', strategy, 'Mode:', isPaperTrading ? 'Paper Trading' : 'Live', 'Market:', marketType || 'spot', 'Interval:', interval || 'default')
   
   const bot = {
     id,
@@ -231,6 +231,7 @@ export async function startBot({ apiKey, secretKey, symbol, vol, tpPct, slPct, s
     autoSell: autoSell !== undefined ? !!autoSell : true,
     isPaperTrading: !!isPaperTrading,
     marketType: marketType || 'spot',
+    interval: interval, // Can be undefined, will fallback to strategy default
     timer: null,
     lastOrder: null,
     entry: null,
@@ -271,6 +272,25 @@ async function executeBuy(bot, price, indicators) {
     const externalOid = `${bot.id}:open:${Date.now()}`
     
     let res
+    let finalVol = vol
+    if (!isPaperTrading) {
+        // Truncate quoteOrderQty (vol) to quoteAmountPrecision
+        try {
+            let info = await fetchExchangeInfo()
+            let sInfo = info.find(s => s.symbol === symbol)
+            if (!sInfo) {
+                info = await fetchExchangeInfo(true)
+                sInfo = info.find(s => s.symbol === symbol)
+            }
+            if (sInfo && sInfo.quoteAmountPrecision !== undefined) {
+                 const prec = Number(sInfo.quoteAmountPrecision)
+                 const factor = Math.pow(10, prec)
+                 finalVol = Math.floor(vol * factor) / factor
+                 console.log(`[${bot.id}] Buy Logic: Truncated vol ${vol} to ${finalVol} (Precision ${prec})`)
+            }
+        } catch(e) { console.error('Buy precision fetch failed', e) }
+    }
+
     if (isPaperTrading) {
       console.log(`[${bot.id}] Simulating BUY of ${vol} USDT of ${symbol} at ~${price}`)
       const simulatedQty = vol / price
@@ -290,7 +310,7 @@ async function executeBuy(bot, price, indicators) {
         }
       }
     } else {
-      res = await placeOrder({ apiKey, secretKey, symbol, side, type: 'MARKET', quoteOrderQty: vol })
+      res = await placeOrder({ apiKey, secretKey, symbol, side, type: 'MARKET', quoteOrderQty: finalVol })
     }
 
     console.log("order status>>>>", res.status)
@@ -442,13 +462,23 @@ async function executeSell(bot, reason) {
   let precision = 2 
   let baseAsset = null
   try {
-     const info = await fetchExchangeInfo()
-     const sInfo = info.find(s => s.symbol === symbol)
+     let info = await fetchExchangeInfo()
+     let sInfo = info.find(s => s.symbol === symbol)
+     
+     // If not found, force refresh
+     if (!sInfo) {
+         console.log(`[${bot.id}] Symbol ${symbol} not found in cache, refreshing exchange info...`)
+         info = await fetchExchangeInfo(true)
+         sInfo = info.find(s => s.symbol === symbol)
+     }
+
      if (sInfo) {
          if (sInfo.baseSizePrecision !== undefined) {
              precision = Number(sInfo.baseSizePrecision)
          }
          baseAsset = sInfo.baseCoin
+     } else {
+         console.warn(`[${bot.id}] Symbol ${symbol} not found in exchange info after refresh. Using default precision 2.`)
      }
   } catch(e) { console.error('Exchange info fetch failed:', e) }
 
@@ -581,9 +611,10 @@ async function strategyTick(bot) {
   
   // Select strategy module
   const strategyModule = strategies[strategy] || strategies['trend-following']
+  const interval = bot.interval || strategyModule.interval || '1m'
    
   const fetchFn = bot.marketType === 'futures' ? fetchFuturesKlines : fetchKlines
-  const kl = await fetchFn(symbol, '1m')
+  const kl = await fetchFn(symbol, interval)
 
   // Spot klines: [time, open, high, low, close, vol, ...]
   if (!Array.isArray(kl) || kl.length < 200) return // Need enough history for EMA200

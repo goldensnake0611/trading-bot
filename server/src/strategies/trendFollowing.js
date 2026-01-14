@@ -1,24 +1,29 @@
 import { ema } from '../utils/math.js'
 
-export const name = 'Trend Following'
-export const description = 'Buy when Price > 200 EMA and 50 EMA > 200 EMA. Sell when Price < 200 EMA or 50 EMA < 200 EMA.'
+export const name = 'Trend Following (EMA 9/50)'
+export const description = 'Buy when Fast EMA (9) crosses above Slow EMA (50). Sell when Fast EMA (9) crosses below Slow EMA (50). Timeframe: 5m.'
+export const interval = '5m'
 
 export function analyze(klines) {
-  if (klines.length < 200) return { action: 'HOLD' }
+  if (klines.length < 50) return { action: 'HOLD' }
 
   const closes = klines.map(k => Number(k[4]))
   const price = closes.at(-1)
   
-  const ema50 = ema(closes.slice(-200), 50)
-  const ema200 = ema(closes.slice(-200), 200)
-
-  // We need to check if 50 crossed above 200 recently or is just above it.
-  // "Strict" crossover check usually requires looking at previous candle.
-  // For simplicity in this loop-based bot, we check if conditions are met now.
-  // Ideally: 50 > 200 AND Price > 200.
+  // Current EMAs
+  const ema9 = ema(closes, 9)
+  const ema50 = ema(closes, 50)
   
-  const shouldBuy = price > ema200 && ema50 > ema200
-  const shouldSell = price < ema200 || ema50 < ema200 // Trend Broken
+  // Previous EMAs
+  const prevCloses = closes.slice(0, -1)
+  const prevEma9 = ema(prevCloses, 9)
+  const prevEma50 = ema(prevCloses, 50)
+
+  // Buy: Fast crosses ABOVE Slow
+  const shouldBuy = prevEma9 <= prevEma50 && ema9 > ema50
+  
+  // Sell: Fast crosses BELOW Slow
+  const shouldSell = prevEma9 >= prevEma50 && ema9 < ema50
 
   let action = 'HOLD'
   if (shouldBuy) action = 'BUY'
@@ -28,8 +33,10 @@ export function analyze(klines) {
     action,
     indicators: {
       price,
+      ema9,
       ema50,
-      ema200
+      prevEma9,
+      prevEma50
     }
   }
 }

@@ -96,6 +96,7 @@ export default function Dashboard() {
   // Form State
   const [symbol, setSymbol] = useState('')
   const [strategy, setStrategy] = useState('trend-following')
+  const [candleInterval, setCandleInterval] = useState('1m')
   const [historyStrategyFilter, setHistoryStrategyFilter] = useState('All')
   const [vol, setVol] = useState(10)
   const [tpPct, setTpPct] = useState(1)
@@ -215,7 +216,7 @@ export default function Dashboard() {
     await fetch('/api/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ symbol, vol, tpPct, slPct, strategy, autoSell, isPaperTrading, marketType })
+      body: JSON.stringify({ symbol, vol, tpPct, slPct, strategy, autoSell, isPaperTrading, marketType, interval: candleInterval })
     })
     refreshTrading()
   }
@@ -598,6 +599,24 @@ export default function Dashboard() {
                 )}
               </select>
             </label>
+
+            <div style={{ margin: '15px 0' }}>
+              <label style={{ margin: '0 0 8px 0' }}>
+                Candle Timeframe
+              </label>
+              <select value={candleInterval} onChange={e => setCandleInterval(e.target.value)}>
+                <option value="1m">1 Minute</option>
+                <option value="5m">5 Minutes</option>
+                <option value="15m">15 Minutes</option>
+                <option value="30m">30 Minutes</option>
+                <option value="1h">1 Hour</option>
+                <option value="4h">4 Hours</option>
+                <option value="8h">8 Hours</option>
+                <option value="1d">1 Day</option>
+                <option value="1w">1 Week</option>
+                <option value="1M">1 Month</option>
+              </select>
+            </div>
 
             <label>
               Position Size (USDT)
