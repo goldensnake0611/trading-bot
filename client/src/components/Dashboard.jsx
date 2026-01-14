@@ -111,6 +111,9 @@ export default function Dashboard() {
 
   useEffect(() => {
     localStorage.setItem('market_type', marketType)
+    if (marketType === 'futures') {
+      setIsPaperTrading(true)
+    }
   }, [marketType])
 
   useEffect(() => {
@@ -629,11 +632,15 @@ export default function Dashboard() {
                 type="checkbox" 
                 id="paper-trading" 
                 checked={isPaperTrading} 
-                onChange={e => setIsPaperTrading(e.target.checked)} 
-                style={{ width: 'auto', margin: 0 }}
+                onChange={e => {
+                  if (marketType === 'futures') return
+                  setIsPaperTrading(e.target.checked)
+                }} 
+                disabled={marketType === 'futures'}
+                style={{ width: 'auto', margin: 0, opacity: marketType === 'futures' ? 0.5 : 1 }}
               />
-              <label htmlFor="paper-trading" style={{ margin: 0, fontWeight: 'normal', cursor: 'pointer' }}>
-                Test Mode (Paper Trading) - No real orders
+              <label htmlFor="paper-trading" style={{ margin: 0, fontWeight: 'normal', cursor: marketType === 'futures' ? 'not-allowed' : 'pointer', color: marketType === 'futures' ? '#aaa' : 'inherit' }}>
+                Test Mode (Paper Trading) - No real orders {marketType === 'futures' && '(Required for Futures)'}
               </label>
             </div>
 

@@ -1,4 +1,4 @@
-import { fetchKlines, placeOrder, fetchExchangeInfo, fetchAccountInfo } from './mexcService.js'
+import { fetchKlines, fetchFuturesKlines, placeOrder, fetchExchangeInfo, fetchAccountInfo } from './mexcService.js'
 import { computePnl } from '../utils/math.js'
 import fs from 'fs'
 import path from 'path'
@@ -245,7 +245,8 @@ export async function startBot({ apiKey, secretKey, symbol, vol, tpPct, slPct, s
 
   if (immediate) {
       try {
-        const kl = await fetchKlines(symbol, '1m')
+        const fetchFn = marketType === 'futures' ? fetchFuturesKlines : fetchKlines
+        const kl = await fetchFn(symbol, '1m')
         if (kl && kl.length > 0) {
             const price = Number(kl.at(-1)[4])
             await executeBuy(bot, price, { trigger: 'Manual Immediate Buy' })
@@ -349,7 +350,8 @@ export async function manualBuy(id) {
   if (!bot) return { success: false, error: 'Bot not found' }
   if (bot.positionSide) return { success: false, error: 'Position already open' }
   try {
-    const kl = await fetchKlines(bot.symbol, '1m')
+    const fetchFn = bot.marketType === 'futures' ? fetchFuturesKlines : fetchKlines
+    const kl = await fetchFn(bot.symbol, '1m')
     if (!kl || kl.length === 0) return { success: false, error: 'Price unavailable' }
     const price = Number(kl.at(-1)[4])
     await executeBuy(bot, price, { trigger: 'Manual Buy' })
@@ -428,7 +430,8 @@ async function executeSell(bot, reason) {
   // Better to fetch fresh price
   let price = bot.lastPrice
   try {
-     const kl = await fetchKlines(symbol, '1m')
+     const fetchFn = bot.marketType === 'futures' ? fetchFuturesKlines : fetchKlines
+     const kl = await fetchFn(symbol, '1m')
      if (kl && kl.length > 0) price = Number(kl.at(-1)[4])
   } catch(e) {}
 
@@ -579,7 +582,8 @@ async function strategyTick(bot) {
   // Select strategy module
   const strategyModule = strategies[strategy] || strategies['trend-following']
    
-  const kl = await fetchKlines(symbol, '1m')
+  const fetchFn = bot.marketType === 'futures' ? fetchFuturesKlines : fetchKlines
+  const kl = await fetchFn(symbol, '1m')
 
   // Spot klines: [time, open, high, low, close, vol, ...]
   if (!Array.isArray(kl) || kl.length < 200) return // Need enough history for EMA200
