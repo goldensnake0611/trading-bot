@@ -151,13 +151,13 @@ export default function IndicatorAnalyzer() {
       return (
         <div className="bg-[#0f111a] p-4 border border-gray-700 rounded-lg shadow-2xl text-sm font-mono backdrop-blur-sm bg-opacity-95">
           <p className="text-gray-400 mb-2 border-b border-gray-700 pb-2">{new Date(d.time).toLocaleString()}</p>
-          <div className="space-y-1">
-            <p className="text-emerald-400 font-bold flex justify-between gap-4">
-              <span>Price:</span>
+          <div className="flex items-center gap-6">
+            <p className="text-emerald-400 font-bold">
+              <span>Price: </span>
               <span>{d.close}</span>
             </p>
-            <p className="text-purple-400 flex justify-between gap-4">
-              <span>RSI:</span>
+            <p className="text-purple-400">
+              <span>RSI: </span>
               <span>{d.rsi ? d.rsi.toFixed(2) : 'N/A'}</span>
             </p>
           </div>
@@ -171,52 +171,77 @@ export default function IndicatorAnalyzer() {
 
   return (
     <div className="p-6 bg-[#1e2030] rounded-xl border border-gray-800 shadow-xl">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-[#d46a84] mb-2">Indicator Analyzer</h2>
-          <p className="text-gray-400 text-sm">Analyze technical indicators and historical data</p>
-          {currentPrice && (
-            <div className="mt-2 text-xl font-mono text-emerald-400">
-              Current Price: <span className="font-bold">{currentPrice}</span>
-            </div>
-          )}
-        </div>
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-[#d46a84] mb-2">Indicator Analyzer</h2>
+        <p className="text-gray-400 text-sm mb-4">Analyze technical indicators and historical data</p>
         
-        <div className="flex flex-wrap items-center gap-3">
-          <SymbolSearch value={symbol} onChange={setSymbol} />
-          
-          <select 
-            value={timeframe} 
-            onChange={(e) => setTimeframe(e.target.value)}
-            className="bg-gray-900 border border-gray-700 text-gray-200 text-sm rounded-lg focus:ring-purple-500 focus:border-purple-500 block p-2.5"
-          >
-            {timeframes.map(tf => (
-              <option key={tf} value={tf}>{tf}</option>
-            ))}
-          </select>
+        <div className="analyzer-controls flex flex-nowrap items-center gap-6 bg-gray-900/50 p-3 rounded-lg border border-gray-800 overflow-x-auto whitespace-nowrap">
+           {/* Price */}
+           {currentPrice && (
+            <div className="flex items-center gap-3 pl-2 shrink-0">
+               <span className="text-gray-500 font-bold text-sm uppercase tracking-wider">Price</span>
+               <span className="text-emerald-400 font-mono font-bold text-lg">{currentPrice}</span>
+            </div>
+           )}
 
-          <div className="flex items-center gap-2 bg-gray-900 border border-gray-700 rounded-lg p-2">
-            <span className="text-gray-400 text-sm">RSI:</span>
-            <input 
-              type="number" 
-              value={period} 
-              onChange={(e) => setPeriod(Number(e.target.value))}
-              className="bg-transparent text-gray-200 text-sm w-12 focus:outline-none text-center"
-              min="1"
-            />
-          </div>
+           {/* Vertical Divider */}
+           {currentPrice && <div className="h-8 w-px bg-gray-700/50 mx-2 shrink-0"></div>}
 
-           <div className="flex items-center gap-2 bg-gray-900 border border-gray-700 rounded-lg p-2 px-3">
-            <input 
-              type="checkbox" 
-              id="useFutures"
-              checked={useFutures} 
-              onChange={(e) => setUseFutures(e.target.checked)}
-              className="w-4 h-4 text-purple-600 bg-gray-700 border-gray-600 rounded focus:ring-purple-600 focus:ring-2"
-            />
-            <label htmlFor="useFutures" className="text-gray-400 text-sm cursor-pointer select-none">Futures Data</label>
-          </div>
+            {/* Symbol */}
+            <div className="w-[160px] shrink-0 relative">
+              <SymbolSearch value={symbol} onChange={setSymbol} />
+            </div>
+            
+            {/* Interval */}
+            <select 
+              value={timeframe} 
+              onChange={(e) => setTimeframe(e.target.value)}
+              className="!w-20 bg-[#0f111a] border border-gray-700 text-gray-200 text-sm rounded px-3 py-2 focus:ring-1 focus:ring-purple-500 focus:border-purple-500 outline-none hover:border-gray-600 transition-colors shrink-0 cursor-pointer"
+            >
+              {timeframes.map(tf => (
+                <option key={tf} value={tf}>{tf}</option>
+              ))}
+            </select>
+
+            {/* RSI */}
+            <div className="flex items-center gap-3 bg-[#0f111a] border border-gray-700 rounded px-3 py-2 hover:border-gray-600 transition-colors shrink-0">
+              <span className="text-gray-500 text-xs font-bold uppercase tracking-wider">RSI</span>
+              <input 
+                type="number" 
+                value={period} 
+                onChange={(e) => setPeriod(Number(e.target.value))}
+                className="!w-12 bg-transparent text-gray-200 text-sm focus:outline-none text-center font-mono p-0 border-none"
+                min="1"
+              />
+            </div>
+
+            {/* Futures Checkbox */}
+            <div className="flex items-center gap-2 px-2 cursor-pointer group shrink-0 ml-auto">
+              <input 
+                type="checkbox" 
+                id="useFutures"
+                checked={useFutures} 
+                onChange={(e) => setUseFutures(e.target.checked)}
+                className="!w-4 !h-4 text-purple-600 bg-[#0f111a] border-gray-600 rounded focus:ring-purple-600 focus:ring-1 cursor-pointer"
+              />
+              <label htmlFor="useFutures" className="!m-0 !inline-block text-gray-400 text-xs font-bold uppercase tracking-wide cursor-pointer group-hover:text-gray-300 select-none">
+                Futures
+              </label>
+            </div>
         </div>
+        <style>{`
+          .analyzer-controls input, .analyzer-controls select {
+            width: auto !important;
+            margin: 0 !important;
+          }
+          /* Fix for SymbolSearch input specifically */
+          .analyzer-controls .dropdown-wrapper input {
+            width: 100% !important; /* Keep 100% relative to wrapper */
+            background: #0f111a;
+            border: 1px solid #374151;
+            padding: 8px 12px;
+          }
+        `}</style>
       </div>
 
       <div style={{ minHeight: '500px', height: '600px', background: '#1e2030', padding: '20px', borderRadius: '8px' }}>

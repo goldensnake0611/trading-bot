@@ -3,7 +3,7 @@ import * as botEngine from '../services/botEngine.js'
 
 export async function startBot(req, res) {
   console.log('Received start request:', req.body)
-  const { apiKey, apiSecret, symbol, vol, tpPct, slPct, strategy, autoSell, isPaperTrading, immediate } = req.body
+  const { apiKey, apiSecret, symbol, vol, tpPct, slPct, strategy, autoSell, isPaperTrading, immediate, marketType } = req.body
   const resolvedKey = apiKey || process.env.MEXC_API_KEY
   const resolvedSecret = apiSecret || process.env.MEXC_API_SECRET
   
@@ -22,7 +22,8 @@ export async function startBot(req, res) {
     strategy,
     autoSell,
     isPaperTrading,
-    immediate
+    immediate,
+    marketType
   })
   
   return res.json({ id })

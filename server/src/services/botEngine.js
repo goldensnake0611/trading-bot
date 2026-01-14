@@ -215,9 +215,9 @@ export function deleteAllHistory() {
   return { success: true, count: initialLen }
 }
 
-export async function startBot({ apiKey, secretKey, symbol, vol, tpPct, slPct, strategy, autoSell, isPaperTrading, immediate }) {
+export async function startBot({ apiKey, secretKey, symbol, vol, tpPct, slPct, strategy, autoSell, isPaperTrading, immediate, marketType }) {
   const id = `${symbol}:${Date.now()}`
-  console.log('Starting bot with ID:', id, 'Strategy:', strategy, 'Mode:', isPaperTrading ? 'Paper Trading' : 'Live')
+  console.log('Starting bot with ID:', id, 'Strategy:', strategy, 'Mode:', isPaperTrading ? 'Paper Trading' : 'Live', 'Market:', marketType || 'spot')
   
   const bot = {
     id,
@@ -230,6 +230,7 @@ export async function startBot({ apiKey, secretKey, symbol, vol, tpPct, slPct, s
     strategy: strategy || 'trend-following', // Default
     autoSell: autoSell !== undefined ? !!autoSell : true,
     isPaperTrading: !!isPaperTrading,
+    marketType: marketType || 'spot',
     timer: null,
     lastOrder: null,
     entry: null,
@@ -479,11 +480,10 @@ async function executeSell(bot, reason) {
   console.log(`[${bot.id}] Sell Logic: Symbol=${symbol}, Raw=${rawQty}, Precision=${precision}, Final=${quantityToSell}, Base=${baseAsset || '?'}`)
 
   if (quantityToSell <= 0) {
-      const msg = `SELL Failed: Quantity ${quantityToSell} is too small (Raw: ${rawQty}, Precision: ${precision})`
-      console.error(`[${bot.id}] ${msg}`)
-      // Log error but keep bot state for now?
-      // Just return error
-      return { status: 400, data: { msg } }
+      const msg = `SELL SKIPPED: Quantity ${quantityToSell} is too small (Raw: ${rawQty}, Precision: ${precision}). This is likely dust.`
+      console.warn(`[${bot.id}] ${msg}`)
+      // Do not treat as a hard error that needs UI feedback, just skip
+      return { status: 200, data: { msg: 'Skipped dust sell' } }
   }
 
   let res

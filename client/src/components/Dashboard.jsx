@@ -74,6 +74,7 @@ function EditPositionModal({ position, onClose, onSave }) {
 export default function Dashboard() {
   const { logout } = useAuth()
   const [activeTab, setActiveTab] = useState('trading')
+  const [marketType, setMarketType] = useState(() => localStorage.getItem('market_type') || 'spot')
   const [balance, setBalance] = useState('Loading...')
   const [dailyPnl, setDailyPnl] = useState(0)
   const [status, setStatus] = useState([])
@@ -104,10 +105,13 @@ export default function Dashboard() {
   const [editingPosition, setEditingPosition] = useState(null)
   const longPressTimer = useRef(null)
 
-  // Notification State
   const [showNotification, setShowNotification] = useState(false)
   const [lastLogTime, setLastLogTime] = useState(null)
   const notificationTimer = useRef(null)
+
+  useEffect(() => {
+    localStorage.setItem('market_type', marketType)
+  }, [marketType])
 
   useEffect(() => {
     if (systemLogs.length > 0) {
@@ -208,7 +212,7 @@ export default function Dashboard() {
     await fetch('/api/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ symbol, vol, tpPct, slPct, strategy, autoSell, isPaperTrading })
+      body: JSON.stringify({ symbol, vol, tpPct, slPct, strategy, autoSell, isPaperTrading, marketType })
     })
     refreshTrading()
   }
@@ -450,7 +454,45 @@ export default function Dashboard() {
     <div className="container">
       <div className="card">
         <div className="header">
-          <h1>MEXC Spot Trading Bot v2.0</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <h1>MEXC Trading Bot v3</h1>
+            <div style={{ display: 'inline-flex', borderRadius: '999px', padding: '3px', background: 'rgba(0,0,0,0.25)' }}>
+              <button
+                onClick={() => setMarketType('spot')}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: '11px',
+                  borderRadius: '999px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  minWidth: '60px',
+                  background: marketType === 'spot' ? '#d46a84' : 'transparent',
+                  color: marketType === 'spot' ? '#fff' : '#d0c4d8',
+                  boxShadow: marketType === 'spot' ? '0 0 10px rgba(212,106,132,0.5)' : 'none',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                Spot
+              </button>
+              <button
+                onClick={() => setMarketType('futures')}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: '11px',
+                  borderRadius: '999px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  minWidth: '60px',
+                  background: marketType === 'futures' ? '#4c3fcf' : 'transparent',
+                  color: marketType === 'futures' ? '#fff' : '#d0c4d8',
+                  boxShadow: marketType === 'futures' ? '0 0 10px rgba(90,80,220,0.5)' : 'none',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                Futures
+              </button>
+            </div>
+          </div>
           <button onClick={logout} className="logout-btn">Logout</button>
         </div>
         
