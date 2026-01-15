@@ -12,7 +12,8 @@ export function analyze(klines, botParams) {
   // We use 100 to be safe
   if (klines.length < 96) return { action: 'HOLD' }
   
-  const relevantKlines = klines.slice(-96)
+  // const relevantKlines = klines.slice(-96)
+  const relevantKlines = klines
   
   const prices = relevantKlines.map(k => Number(k[4]))
   const currentPrice = prices.at(-1)
@@ -20,8 +21,8 @@ export function analyze(klines, botParams) {
   const maxPrice = Math.max(...prices)
   
   // Signal Generation (percent values)
-  const risePct = currentPrice > 0 ? ((currentPrice - minPrice) / currentPrice) * 100 : 0
-  const dropPct = currentPrice > 0 ? ((maxPrice - currentPrice) / currentPrice) * 100 : 0
+  const risePct = currentPrice > 0 ? ((currentPrice - minPrice) / currentPrice) : 0
+  const dropPct = currentPrice > 0 ? ((maxPrice - currentPrice) / currentPrice) : 0
   const thresholdPct = threshold
   
   let action = 'HOLD'

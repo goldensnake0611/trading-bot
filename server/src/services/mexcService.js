@@ -150,7 +150,28 @@ export async function fetchExchangeInfo(force = false) {
   }
 }
 
-export async function fetchTicker24hr() {
+export async function fetchTicker24hr(marketType = 'spot') {
+  if (marketType === 'futures') {
+    const url = 'https://contract.mexc.com/api/v1/contract/ticker'
+    try {
+      const res = await fetch(url)
+      const json = await res.json()
+      if (json.success && Array.isArray(json.data)) {
+        return json.data.map(t => ({
+          symbol: t.symbol.replace('_', ''), // Convert BTC_USDT -> BTCUSDT to match system convention
+          lastPrice: t.lastPrice,
+          quoteVolume: t.amount24, // Map amount24 (turnover) to quoteVolume
+          priceChangePercent: t.riseFallRate * 100
+        }))
+      }
+      return []
+    } catch (e) {
+      console.error('Fetch Futures Ticker Error:', e)
+      return []
+    }
+  }
+
+  // Spot
   const url = 'https://api.mexc.com/api/v3/ticker/24hr'
   try {
     const res = await fetch(url)

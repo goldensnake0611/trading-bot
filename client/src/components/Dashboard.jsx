@@ -122,7 +122,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (activeTab !== 'scanner') return
     
-    const delay = scanStrategy === 'volatility-swing' ? 60000 * 5 : 60000
+    const delay = scanStrategy === 'volatility-swing' ? 60000 * 5 : 60000 * 2
 
     const interval = setInterval(() => {
       if (!isScanning) {
@@ -759,7 +759,7 @@ export default function Dashboard() {
                         </a>
                       </td>
                       <td>{r.price}</td>
-                      <td style={{ color: '#4caf50', fontWeight: 'bold' }}>{r.action}</td>
+                      <td style={{ color: r.action === 'SELL' ? '#ff4d4d' : '#4caf50', fontWeight: 'bold' }}>{r.action}</td>
                       <td style={{ fontSize: '12px', color: '#aaa' }}>
                         {Object.entries(r.indicators || {}).map(([k, v]) => (
                           <span key={k} style={{ marginRight: '8px' }}>

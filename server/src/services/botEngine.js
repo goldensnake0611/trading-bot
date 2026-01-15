@@ -228,31 +228,21 @@ export async function scanMarket(strategyId, marketType, interval, params = {}) 
   
   let symbols = []
   
-  if (marketType === 'futures') {
-      // For futures, getting the list of contracts is better
-      // We don't have a fetchFuturesTicker yet, but fetchFuturesKlines handles symbol conversion.
-      // Let's use a hardcoded list of top pairs or just all USDT pairs from exchangeInfo for now.
-      // But scanning ALL futures is slow. Let's limit to top 30 "blue chips" or similar if we can't sort by volume.
-      // Better: Use the same list as Spot but convert to Futures symbol format, assuming liquid spot = liquid futures roughly.
-      const tickers = await fetchTicker24hr()
-      symbols = tickers
-        .filter(t => t.symbol.endsWith('USDT') && Number(t.quoteVolume) > 0) // All USDT pairs with volume
-        .sort((a, b) => Number(b.quoteVolume) - Number(a.quoteVolume))
-        .map(t => t.symbol)
-  } else {
-      const tickers = await fetchTicker24hr()
-      symbols = tickers
-        .filter(t => t.symbol.endsWith('USDT') && Number(t.quoteVolume) > 0) // All USDT pairs with volume
-        .sort((a, b) => Number(b.quoteVolume) - Number(a.quoteVolume))
-        .map(t => t.symbol)
-  }
+  // Fetch tickers based on market type (Spot or Futures)
+  // fetchTicker24hr now handles normalization (BTC_USDT -> BTCUSDT for futures)
+  const tickers = await fetchTicker24hr(marketType)
+  
+  symbols = tickers
+    .filter(t => t.symbol.endsWith('USDT') && Number(t.quoteVolume) > 1000) // All USDT pairs with volume
+    .sort((a, b) => Number(b.quoteVolume) - Number(a.quoteVolume))
+    .map(t => t.symbol)
 
-  console.log(`Scanning ${symbols.length} symbols for ${strategyId}...`)
+  console.log(`Scanning ${symbols.length} symbols for ${strategyId} (${marketType})...`)
 
   const results = []
   
   // Process in batches to be nice to API
-  const batchSize = 10
+  const batchSize = 5
   for (let i = 0; i < symbols.length; i += batchSize) {
       const batch = symbols.slice(i, i + batchSize)
       await Promise.all(batch.map(async (symbol) => {
@@ -261,7 +251,7 @@ export async function scanMarket(strategyId, marketType, interval, params = {}) 
               const kl = await fetchFn(symbol, interval || '1m', 200) // Need enough for strategy
               if (!kl || kl.length < 50) return
 
-              console.log("length of kl>>>>>", kl.length)
+              console.log(i, ">>>>> length of kl>>>>>", kl.length)
               // Normalize klines/closes for strategy
               // Existing strategies might use `closes` or `klines`. 
               // We need to support both or standardize.
@@ -276,7 +266,7 @@ export async function scanMarket(strategyId, marketType, interval, params = {}) 
                   res = strategyModule.analyze(kl, params)
               }
 
-              if (res.action === 'BUY') {
+              if (res.action !== 'HOLD') {
                   const price = Number(kl.at(-1)[4])
                   results.push({
                       symbol,
