@@ -1,4 +1,4 @@
-import { fetchKlines, fetchFuturesKlines, placeOrder, fetchExchangeInfo, fetchAccountInfo } from './mexcService.js'
+import { fetchKlines, fetchFuturesKlines, placeOrder, fetchExchangeInfo, fetchAccountInfo, fetchTicker24hr } from './mexcService.js'
 import { computePnl } from '../utils/math.js'
 import fs from 'fs'
 import path from 'path'
@@ -12,6 +12,7 @@ import * as rsiEmaPullback from '../strategies/rsiEmaPullback.js'
 import * as rsiEmaTrendStrategy from '../strategies/rsiEmaTrendStrategy.js'
 import * as vwapScalping from '../strategies/vwapScalping.js'
 import * as dca from '../strategies/dca.js'
+import * as volatilitySwing from '../strategies/volatilitySwing.js'
 
 const strategies = {
   'ema-crossover': emaCrossover,
@@ -19,7 +20,8 @@ const strategies = {
   'rsi-ema-pullback': rsiEmaPullback,
   'rsi-ema-trend': rsiEmaTrendStrategy,
   'vwap-scalping': vwapScalping,
-  'dca': dca
+  'dca': dca,
+  'volatility-swing': volatilitySwing
 }
 
 export function getAvailableStrategies() {
@@ -215,8 +217,89 @@ export function deleteAllHistory() {
   return { success: true, count: initialLen }
 }
 
-export async function startBot({ apiKey, secretKey, symbol, vol, tpPct, slPct, strategy, autoSell, isPaperTrading, immediate, marketType, interval }) {
+export async function scanMarket(strategyId, marketType, interval, params = {}) {
+  const strategyModule = strategies[strategyId]
+  if (!strategyModule) throw new Error('Invalid strategy')
+
+  // 1. Get Top Liquid Pairs (Volume > 0) to avoid waste
+  // For futures, we might need a different list, but let's stick to Spot Tickers for now 
+  // or just use symbols from exchangeInfo if marketType is futures.
+  // Actually, for Futures, there is a different ticker endpoint usually, but let's start with Spot logic for filtering.
+  
+  let symbols = []
+  
+  if (marketType === 'futures') {
+      // For futures, getting the list of contracts is better
+      // We don't have a fetchFuturesTicker yet, but fetchFuturesKlines handles symbol conversion.
+      // Let's use a hardcoded list of top pairs or just all USDT pairs from exchangeInfo for now.
+      // But scanning ALL futures is slow. Let's limit to top 30 "blue chips" or similar if we can't sort by volume.
+      // Better: Use the same list as Spot but convert to Futures symbol format, assuming liquid spot = liquid futures roughly.
+      const tickers = await fetchTicker24hr()
+      symbols = tickers
+        .filter(t => t.symbol.endsWith('USDT') && Number(t.quoteVolume) > 1000000) // > 1M USDT volume
+        .sort((a, b) => Number(b.quoteVolume) - Number(a.quoteVolume))
+        .slice(0, 50) // Top 50
+        .map(t => t.symbol)
+  } else {
+      const tickers = await fetchTicker24hr()
+      symbols = tickers
+        .filter(t => t.symbol.endsWith('USDT') && Number(t.quoteVolume) > 500000) // > 500k USDT volume
+        .sort((a, b) => Number(b.quoteVolume) - Number(a.quoteVolume))
+        .slice(0, 50) // Top 50
+        .map(t => t.symbol)
+  }
+
+  console.log(`Scanning ${symbols.length} symbols for ${strategyId}...`)
+
+  const results = []
+  
+  // Process in batches to be nice to API
+  const batchSize = 5
+  for (let i = 0; i < symbols.length; i += batchSize) {
+      const batch = symbols.slice(i, i + batchSize)
+      await Promise.all(batch.map(async (symbol) => {
+          try {
+              const fetchFn = marketType === 'futures' ? fetchFuturesKlines : fetchKlines
+              const kl = await fetchFn(symbol, interval || '1m', 100) // Need enough for strategy
+              if (!kl || kl.length < 50) return
+
+              // Normalize klines/closes for strategy
+              // Existing strategies might use `closes` or `klines`. 
+              // We need to support both or standardize.
+              // Most strategies we saw use `analyze(klines)` or `analyze(closes)`.
+              // `trendFollowing` uses `klines`. `emaCrossover` uses `closes`.
+              
+              let res
+              if (strategyId === 'ema-crossover') {
+                  const closes = kl.map(k => Number(k[4]))
+                  res = strategyModule.analyze(closes, params)
+              } else {
+                  res = strategyModule.analyze(kl, params)
+              }
+
+              if (res.action === 'BUY') {
+                  const price = Number(kl.at(-1)[4])
+                  results.push({
+                      symbol,
+                      price,
+                      indicators: res.indicators,
+                      action: res.action
+                  })
+              }
+          } catch (e) {
+              console.error(`Error scanning ${symbol}:`, e.message)
+          }
+      }))
+      // Small delay between batches
+      await new Promise(r => setTimeout(r, 200))
+  }
+  
+  return results
+}
+
+export async function startBot({ apiKey, secretKey, symbol, vol, tpPct, slPct, strategy, autoSell, isPaperTrading, immediate, marketType, interval, volatilityThreshold }) {
   const id = `${symbol}:${Date.now()}`
+  
   console.log('Starting bot with ID:', id, 'Strategy:', strategy, 'Mode:', isPaperTrading ? 'Paper Trading' : 'Live', 'Market:', marketType || 'spot', 'Interval:', interval || 'default')
   
   const bot = {
@@ -228,6 +311,7 @@ export async function startBot({ apiKey, secretKey, symbol, vol, tpPct, slPct, s
     tpPct: Number(tpPct || 1),
     slPct: Number(slPct || 0.5),
     strategy: strategy || 'trend-following', // Default
+    volatilityThreshold: volatilityThreshold ? Number(volatilityThreshold) : undefined,
     autoSell: autoSell !== undefined ? !!autoSell : true,
     isPaperTrading: !!isPaperTrading,
     marketType: marketType || 'spot',
@@ -638,15 +722,18 @@ async function strategyTick(bot) {
   let action, indicators
   if (strategy === 'ema-crossover') {
      // This one was written to take 'closes' array
-     const res = strategyModule.analyze(closes)
+     const res = strategyModule.analyze(closes, bot)
      action = res.action
      indicators = res.indicators
   } else {
      // The new ones take 'klines'
-     const res = strategyModule.analyze(kl)
+     const res = strategyModule.analyze(kl, bot)
      action = res.action
      indicators = res.indicators
   }
+
+  // Store latest indicators on bot for UI display
+  bot.indicators = indicators
 
   // If no position, check for Buy
   if (!bot.positionSide && action === 'BUY') {

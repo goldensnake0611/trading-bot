@@ -31,5 +31,6 @@ router.get('/strategies', tradeController.getStrategies)
 router.get('/logs', tradeController.getLogs)
 router.get('/stats', tradeController.getStats)
 router.get('/klines', tradeController.getKlines)
+router.post('/scan', tradeController.scanMarket)
 
 export default router

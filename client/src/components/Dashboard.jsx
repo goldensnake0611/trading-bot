@@ -110,6 +110,25 @@ export default function Dashboard() {
   const [lastLogTime, setLastLogTime] = useState(null)
   const notificationTimer = useRef(null)
 
+  const [isScanning, setIsScanning] = useState(false)
+  const [scanResults, setScanResults] = useState([])
+  const [scanStrategy, setScanStrategy] = useState('trend-following')
+  const [scanInterval, setScanInterval] = useState('1m')
+  const [scanPage, setScanPage] = useState(1)
+  const [scanLimit, setScanLimit] = useState(10)
+  const [selectedScanIndex, setSelectedScanIndex] = useState(null)
+  const [volatilityThreshold, setVolatilityThreshold] = useState(40)
+
+  useEffect(() => {
+    if (activeTab !== 'scanner') return
+    const interval = setInterval(() => {
+      if (!isScanning) {
+        handleScan()
+      }
+    }, 60000)
+    return () => clearInterval(interval)
+  }, [activeTab, scanStrategy, scanInterval, marketType, isScanning])
+
   useEffect(() => {
     localStorage.setItem('market_type', marketType)
     if (marketType === 'futures') {
@@ -150,6 +169,35 @@ export default function Dashboard() {
     
     return () => clearInterval(interval)
   }, [activeTab])
+
+  async function handleScan() {
+    setIsScanning(true)
+    setScanResults([])
+    setScanPage(1)
+    try {
+      const res = await fetch('/api/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          strategy: scanStrategy, 
+          marketType, 
+          interval: scanInterval,
+          volatilityThreshold: volatilityThreshold / 100
+        })
+      })
+      if (res.ok) {
+        setScanResults(await res.json())
+      } else {
+        const err = await res.json()
+        alert('Scan failed: ' + err.error)
+      }
+    } catch(e) {
+      console.error(e)
+      alert('Network error')
+    } finally {
+      setIsScanning(false)
+    }
+  }
 
   async function refreshSystemLogs() {
     try {
@@ -216,7 +264,18 @@ export default function Dashboard() {
     await fetch('/api/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ symbol, vol, tpPct, slPct, strategy, autoSell, isPaperTrading, marketType, interval: candleInterval })
+      body: JSON.stringify({ 
+        symbol, 
+        vol, 
+        tpPct, 
+        slPct, 
+        strategy, 
+        autoSell, 
+        isPaperTrading, 
+        marketType, 
+        interval: candleInterval,
+        volatilityThreshold: volatilityThreshold / 100
+      })
     })
     refreshTrading()
   }
@@ -372,9 +431,19 @@ export default function Dashboard() {
   // Let's improve: The "Stop Bot" button will stop the bot for the *selected symbol* if it exists.
   const activeBot = status.find(b => b.symbol === symbol)
 
+  function buildMexcUrl(symbol) {
+    const formatted = symbol.includes('_')
+      ? symbol
+      : (symbol.endsWith('USDT') ? symbol.replace(/USDT$/, '_USDT') : symbol)
+    if (marketType === 'futures') {
+      return `https://www.mexc.com/en-GB/futures/${formatted}?type=linear_swap`
+    }
+    return `https://www.mexc.com/en-GB/exchange/${formatted}`
+  }
+
   function handleRowDoubleClick(symbol) {
-    const formatted = symbol.endsWith('USDT') ? symbol.replace(/USDT$/, '_USDT') : symbol
-    window.open(`https://www.mexc.com/exchange/${formatted}`, '_blank')
+    const url = buildMexcUrl(symbol)
+    window.open(url, '_blank')
   }
 
   function handleRowClick(e, id) {
@@ -564,7 +633,156 @@ export default function Dashboard() {
           >
             Indicator Analyzer
           </button>
+          <button 
+            className={`tab-btn ${activeTab === 'scanner' ? 'active' : ''}`}
+            onClick={() => setActiveTab('scanner')}
+          >
+            Token Detection
+          </button>
         </div>
+
+        {activeTab === 'scanner' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
+              <button 
+                onClick={handleScan} 
+                className="btn-primary" 
+                disabled={isScanning}
+                style={{ height: '38px', minWidth: '120px' }}
+              >
+                {isScanning ? 'Scanning...' : 'Scan Market'}
+              </button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', alignItems: 'end', marginBottom: '20px' }}>
+              <label>
+                Strategy
+                <select value={scanStrategy} onChange={e => setScanStrategy(e.target.value)} style={{ width: '100%' }}>
+                  {strategiesList.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              </label>
+
+              {scanStrategy === 'volatility-swing' && (
+                <label>
+                  Threshold (%)
+                  <input 
+                    type="number" 
+                    value={volatilityThreshold} 
+                    onChange={e => setVolatilityThreshold(e.target.value)} 
+                    step="1" 
+                    style={{ width: '100%' }}
+                  />
+                </label>
+              )}
+              
+              <label>
+                Candle Timeframe
+                <select value={scanInterval} onChange={e => setScanInterval(e.target.value)} style={{ width: '100%' }}>
+                  <option value="1m">1 Minute</option>
+                  <option value="5m">5 Minutes</option>
+                  <option value="15m">15 Minutes</option>
+                  <option value="30m">30 Minutes</option>
+                  <option value="1h">1 Hour</option>
+                  <option value="4h">4 Hours</option>
+                  <option value="1d">1 Day</option>
+                </select>
+              </label>
+            </div>
+            
+            <p style={{ color: '#888', fontSize: '13px', marginBottom: '15px' }}>
+              Scanning top liquid pairs for <strong>{marketType === 'futures' ? 'Futures' : 'Spot'}</strong> BUY signals. Double-click row to open on MEXC.
+            </p>
+
+            <div className="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Symbol</th><th>Price</th><th>Action</th><th>Indicators</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {scanResults.length === 0 && !isScanning && (
+                    <tr>
+                      <td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+                        No opportunities found or scan not started.
+                      </td>
+                    </tr>
+                  )}
+                  {isScanning && (
+                    <tr>
+                      <td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#d46a84' }}>
+                        Scanning market... This may take a moment...
+                      </td>
+                    </tr>
+                  )}
+                  {scanResults
+                    .slice((scanPage - 1) * scanLimit, scanPage * scanLimit)
+                    .map((r, i) => {
+                      const absIndex = (scanPage - 1) * scanLimit + i
+                      return (
+                    <tr 
+                      key={absIndex} 
+                      onClick={(e) => {
+                        if (e.ctrlKey || e.metaKey) {
+                          const url = buildMexcUrl(r.symbol)
+                          window.open(url, '_blank')
+                          return
+                        }
+                        setSelectedScanIndex(absIndex)
+                      }}
+                      onAuxClick={(e) => {
+                        if (e.button === 1) {
+                          const url = buildMexcUrl(r.symbol)
+                          window.open(url, '_blank')
+                        }
+                      }}
+                      onDoubleClick={() => handleRowDoubleClick(r.symbol)} 
+                      style={{ 
+                        cursor: 'pointer',
+                        backgroundColor: selectedScanIndex === absIndex ? 'rgba(255, 255, 255, 0.06)' : 'transparent'
+                      }}
+                      className="hover-row"
+                    >
+                      <td style={{ fontWeight: 'bold', color: '#fff' }}>
+                        <a 
+                          href={buildMexcUrl(r.symbol)} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          style={{ color: '#fff', textDecoration: 'underline' }}
+                          onClick={e => e.stopPropagation()}
+                        >
+                          {r.symbol}
+                        </a>
+                      </td>
+                      <td>{r.price}</td>
+                      <td style={{ color: '#4caf50', fontWeight: 'bold' }}>{r.action}</td>
+                      <td style={{ fontSize: '12px', color: '#aaa' }}>
+                        {Object.entries(r.indicators || {}).map(([k, v]) => (
+                          <span key={k} style={{ marginRight: '8px' }}>
+                            {k}: {typeof v === 'number' ? v.toFixed(4) : v}
+                          </span>
+                        ))}
+                      </td>
+                    </tr>
+                  )})}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+              <p style={{ color: '#777', fontSize: '12px', margin: 0 }}>
+                Tip: Ctrl+Click or middle-click a row to open on MEXC in a new tab.
+              </p>
+              <Pagination 
+                currentPage={scanPage}
+                totalItems={scanResults.length}
+                pageSize={scanLimit}
+                onPageChange={setScanPage}
+                onPageSizeChange={setScanLimit}
+              />
+            </div>
+          </div>
+        )}
 
         {activeTab === 'indicator' && <IndicatorAnalyzer />}
 
@@ -599,6 +817,18 @@ export default function Dashboard() {
                 )}
               </select>
             </label>
+
+            {strategy === 'volatility-swing' && (
+              <label style={{ marginTop: '10px' }}>
+                Volatility Threshold (%)
+                <input 
+                  type="number" 
+                  value={volatilityThreshold} 
+                  onChange={e => setVolatilityThreshold(e.target.value)} 
+                  step="1" 
+                />
+              </label>
+            )}
 
             <div style={{ margin: '15px 0' }}>
               <label style={{ margin: '0 0 8px 0' }}>
@@ -670,21 +900,32 @@ export default function Dashboard() {
               </button>
             </div>
 
-
-
             <h2>Positions</h2>
             <div className="table-wrapper">
               <table>
                 <thead>
                   <tr>
-                    <th>ID</th><th>Symbol</th><th>Strategy</th><th>Entry</th><th>Current</th><th>Vol</th><th>TP</th><th>SL</th><th>PNL</th><th>ROI %</th><th>Action</th>
+                    <th>ID</th><th>Symbol</th><th>Strategy</th><th>Entry</th><th>Current</th><th>EMA 9</th><th>Vol</th><th>TP</th><th>SL</th><th>PNL</th><th>ROI %</th><th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {positions.map(p => (
                     <tr 
                       key={p.id} 
-                      onClick={(e) => handleRowClick(e, p.id)}
+                      onClick={(e) => {
+                        if (e.ctrlKey || e.metaKey) {
+                          const url = buildMexcUrl(p.symbol)
+                          window.open(url, '_blank')
+                          return
+                        }
+                        handleRowClick(e, p.id)
+                      }}
+                      onAuxClick={(e) => {
+                        if (e.button === 1) {
+                          const url = buildMexcUrl(p.symbol)
+                          window.open(url, '_blank')
+                        }
+                      }}
                       onContextMenu={(e) => handlePositionContextMenu(e, p)}
                       onDoubleClick={() => handleRowDoubleClick(p.symbol)}
                       onMouseDown={() => handleRowMouseDown(p)}
@@ -698,10 +939,21 @@ export default function Dashboard() {
                       }}
                     >
                       <td>{p.id}</td>
-                      <td>{p.symbol}</td>
+                      <td>
+                        <a 
+                          href={buildMexcUrl(p.symbol)} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          style={{ color: '#fff', textDecoration: 'underline' }}
+                          onClick={e => e.stopPropagation()}
+                        >
+                          {p.symbol}
+                        </a>
+                      </td>
                       <td>{p.strategy}</td>
                       <td>{p.entry}</td>
                       <td>{p.current}</td>
+                      <td>{p.ema9 ? Number(p.ema9).toFixed(6) : '-'}</td>
                       <td>{p.vol}</td>
                       <td>{p.tp ? Number(p.tp).toFixed(6) : <span style={{color: '#666'}}>Off</span>}</td>
                       <td>{p.sl ? Number(p.sl).toFixed(6) : <span style={{color: '#666'}}>Off</span>}</td>

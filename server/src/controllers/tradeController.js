@@ -3,7 +3,7 @@ import * as botEngine from '../services/botEngine.js'
 
 export async function startBot(req, res) {
   console.log('Received start request:', req.body)
-  const { apiKey, apiSecret, symbol, vol, tpPct, slPct, strategy, autoSell, isPaperTrading, immediate, marketType, interval } = req.body
+  const { apiKey, apiSecret, symbol, vol, tpPct, slPct, strategy, autoSell, isPaperTrading, immediate, marketType, interval, volatilityThreshold } = req.body
   const resolvedKey = apiKey || process.env.MEXC_API_KEY
   const resolvedSecret = apiSecret || process.env.MEXC_API_SECRET
   
@@ -24,7 +24,8 @@ export async function startBot(req, res) {
     isPaperTrading,
     immediate,
     marketType,
-    interval
+    interval,
+    volatilityThreshold
   })
   
   return res.json({ id })
@@ -104,6 +105,7 @@ export function getPositions(req, res) {
       vol: baseQty,
       tp: b.tp,
       sl: b.sl,
+      ema9: b.indicators?.ema9,
       pnl,
       roi
     }
@@ -187,6 +189,19 @@ export async function getKlines(req, res) {
   } catch(e) {
     console.error(e)
     res.status(500).json({ error: 'Failed to fetch klines' })
+  }
+}
+
+export async function scanMarket(req, res) {
+  const { strategy, marketType, interval, volatilityThreshold } = req.body
+  if (!strategy) return res.status(400).json({ error: 'Missing strategy' })
+  
+  try {
+    const results = await botEngine.scanMarket(strategy, marketType || 'spot', interval || '1m', { volatilityThreshold })
+    res.json(results)
+  } catch(e) {
+    console.error('Scan failed:', e)
+    res.status(500).json({ error: e.message })
   }
 }
 

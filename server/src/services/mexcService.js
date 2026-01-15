@@ -149,6 +149,18 @@ export async function fetchExchangeInfo(force = false) {
   }
 }
 
+export async function fetchTicker24hr() {
+  const url = 'https://api.mexc.com/api/v3/ticker/24hr'
+  try {
+    const res = await fetch(url)
+    const data = await res.json().catch(() => ([]))
+    return Array.isArray(data) ? data : []
+  } catch (e) {
+    console.error('Fetch Ticker 24hr Error:', e)
+    return []
+  }
+}
+
 export async function fetchAccountInfo(apiKey, secretKey) {
   const timestamp = Date.now()
   const query = `timestamp=${timestamp}`
