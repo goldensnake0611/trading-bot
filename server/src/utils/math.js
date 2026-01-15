@@ -1,10 +1,25 @@
 export function ema(values, period) {
   if (!values.length || period <= 1) return values.at(-1) || 0
-  const k = 2 / (period + 1)
-  let emaPrev = values[0]
-  for (let i = 1; i < values.length; i++) {
-    emaPrev = values[i] * k + emaPrev * (1 - k)
+
+  const nums = values.map(Number)
+
+  if (nums.length <= period) {
+    const sum = nums.reduce((a, b) => a + b, 0)
+    return sum / nums.length
   }
+
+  const k = 2 / (period + 1)
+
+  let sum = 0
+  for (let i = 0; i < period; i++) {
+    sum += nums[i]
+  }
+  let emaPrev = sum / period
+
+  for (let i = period; i < nums.length; i++) {
+    emaPrev = nums[i] * k + emaPrev * (1 - k)
+  }
+
   return emaPrev
 }
 

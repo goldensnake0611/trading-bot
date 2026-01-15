@@ -26,7 +26,7 @@ export async function placeOrder({ apiKey, secretKey, symbol, side, type = 'MARK
   return { status: res.status, data }
 }
 
-export async function fetchKlines(symbol, interval = '1m', limit = 300, startTime = null, endTime = null) {
+export async function fetchKlines(symbol, interval = '1m', limit = 1000, startTime = null, endTime = null) {
   // Map 1h to 60m for Spot API if needed
   if (interval === '1h') interval = '60m'
   
@@ -39,7 +39,7 @@ export async function fetchKlines(symbol, interval = '1m', limit = 300, startTim
   return data
 }
 
-export async function fetchFuturesKlines(symbol, interval = '5m', limit = 300, startTime = null, endTime = null) {
+export async function fetchFuturesKlines(symbol, interval = '5m', limit = 1000, startTime = null, endTime = null) {
   // Convert Symbol: BTCUSDT -> BTC_USDT
   const futuresSymbol = symbol.replace('USDT', '_USDT')
 

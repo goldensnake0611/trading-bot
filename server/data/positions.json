@@ -1,1 +1,18 @@
-[]
+[
+  {
+    "id": "7f3a58b9-c1de-4e3a-9370-d75faa22a144",
+    "botId": "ICNTUSDT:1768407324342",
+    "symbol": "ICNTUSDT",
+    "strategy": "trend-following",
+    "openTime": 1768454533655,
+    "entryPrice": 0.4942,
+    "direction": "Long",
+    "vol": 20.234722784297855,
+    "status": "Closed",
+    "closeTime": 1768455629310,
+    "closePrice": 0.4908,
+    "closingQuantity": 20,
+    "realizedPnl": -0.06799999999999917,
+    "realizedRoi": -0.6879805746661187
+  }
+]
