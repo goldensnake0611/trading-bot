@@ -236,16 +236,14 @@ export async function scanMarket(strategyId, marketType, interval, params = {}) 
       // Better: Use the same list as Spot but convert to Futures symbol format, assuming liquid spot = liquid futures roughly.
       const tickers = await fetchTicker24hr()
       symbols = tickers
-        .filter(t => t.symbol.endsWith('USDT') && Number(t.quoteVolume) > 1000000) // > 1M USDT volume
+        .filter(t => t.symbol.endsWith('USDT') && Number(t.quoteVolume) > 0) // All USDT pairs with volume
         .sort((a, b) => Number(b.quoteVolume) - Number(a.quoteVolume))
-        .slice(0, 50) // Top 50
         .map(t => t.symbol)
   } else {
       const tickers = await fetchTicker24hr()
       symbols = tickers
-        .filter(t => t.symbol.endsWith('USDT') && Number(t.quoteVolume) > 500000) // > 500k USDT volume
+        .filter(t => t.symbol.endsWith('USDT') && Number(t.quoteVolume) > 0) // All USDT pairs with volume
         .sort((a, b) => Number(b.quoteVolume) - Number(a.quoteVolume))
-        .slice(0, 50) // Top 50
         .map(t => t.symbol)
   }
 
@@ -254,15 +252,16 @@ export async function scanMarket(strategyId, marketType, interval, params = {}) 
   const results = []
   
   // Process in batches to be nice to API
-  const batchSize = 5
+  const batchSize = 10
   for (let i = 0; i < symbols.length; i += batchSize) {
       const batch = symbols.slice(i, i + batchSize)
       await Promise.all(batch.map(async (symbol) => {
           try {
               const fetchFn = marketType === 'futures' ? fetchFuturesKlines : fetchKlines
-              const kl = await fetchFn(symbol, interval || '1m', 100) // Need enough for strategy
+              const kl = await fetchFn(symbol, interval || '1m', 200) // Need enough for strategy
               if (!kl || kl.length < 50) return
 
+              console.log("length of kl>>>>>", kl.length)
               // Normalize klines/closes for strategy
               // Existing strategies might use `closes` or `klines`. 
               // We need to support both or standardize.

@@ -39,7 +39,7 @@ export async function fetchKlines(symbol, interval = '1m', limit = 1000, startTi
   return data
 }
 
-export async function fetchFuturesKlines(symbol, interval = '5m', limit = 1000, startTime = null, endTime = null) {
+export async function fetchFuturesKlines(symbol, interval = '5m', limit = 200, startTime = null, endTime = null) {
   // Convert Symbol: BTCUSDT -> BTC_USDT
   const futuresSymbol = symbol.replace('USDT', '_USDT')
 
@@ -60,15 +60,32 @@ export async function fetchFuturesKlines(symbol, interval = '5m', limit = 1000, 
 
   let url = `https://contract.mexc.com/api/v1/contract/kline/${futuresSymbol}?interval=${mappedInterval}`
   
-  // Note: Futures API uses 'start' and 'end' (seconds or ms? usually seconds for unix, but let's check).
-  // The debug output showed timestamps like 1736077200 which is Seconds (10 digits).
-  // JS Date.now() is MS (13 digits).
-  
-  if (startTime) url += `&start=${Math.floor(startTime / 1000)}`
-  if (endTime) url += `&end=${Math.floor(endTime / 1000)}`
-  
-  // Futures API doesn't seem to support 'limit' directly in the same way, but it relies on time range.
-  // However, we can slice the result if needed.
+  // Determine time range if not provided
+  // If no startTime provided, we calculate it based on limit
+  if (!startTime && !endTime) {
+      // Calculate seconds per interval
+      const intervalSeconds = {
+        '1m': 60,
+        '5m': 300,
+        '15m': 900,
+        '30m': 1800,
+        '1h': 3600,
+        '4h': 14400,
+        '8h': 28800,
+        '1d': 86400,
+        '1w': 604800,
+        '1M': 2592000
+      }[interval] || 3600
+
+      const now = Math.floor(Date.now() / 1000)
+      const end = now
+      const start = now - (limit * intervalSeconds)
+      
+      url += `&start=${start}&end=${end}`
+  } else {
+      if (startTime) url += `&start=${Math.floor(startTime / 1000)}`
+      if (endTime) url += `&end=${Math.floor(endTime / 1000)}`
+  }
   
   try {
     const res = await fetch(url)
@@ -93,22 +110,6 @@ export async function fetchFuturesKlines(symbol, interval = '5m', limit = 1000, 
     }
     
     if (result.length > 0) return result
-    
-    // Fallback: If specific range returns nothing, try fetching latest data (no start/end)
-    // Only if we asked for a specific range
-    if (startTime || endTime) {
-        console.log('Fetch Futures Klines: No data for range, fetching latest...')
-        const fallbackUrl = `https://contract.mexc.com/api/v1/contract/kline/${futuresSymbol}?interval=${mappedInterval}`
-        const res2 = await fetch(fallbackUrl)
-        const json2 = await res2.json()
-        if (json2.success && json2.data) {
-            const { time, open, high, low, close, vol } = json2.data
-            if (!time || !Array.isArray(time)) return []
-            return time.map((t, i) => [
-                t * 1000, open[i], high[i], low[i], close[i], vol[i]
-            ])
-        }
-    }
     
     return []
   } catch (e) {

@@ -121,11 +121,14 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (activeTab !== 'scanner') return
+    
+    const delay = scanStrategy === 'volatility-swing' ? 60000 * 5 : 60000
+
     const interval = setInterval(() => {
       if (!isScanning) {
         handleScan()
       }
-    }, 60000)
+    }, delay)
     return () => clearInterval(interval)
   }, [activeTab, scanStrategy, scanInterval, marketType, isScanning])
 
