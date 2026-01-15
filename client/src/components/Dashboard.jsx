@@ -119,18 +119,7 @@ export default function Dashboard() {
   const [selectedScanIndex, setSelectedScanIndex] = useState(null)
   const [volatilityThreshold, setVolatilityThreshold] = useState(40)
 
-  useEffect(() => {
-    if (activeTab !== 'scanner') return
-    
-    const delay = scanStrategy === 'volatility-swing' ? 60000 * 5 : 60000 * 2
 
-    const interval = setInterval(() => {
-      if (!isScanning) {
-        handleScan()
-      }
-    }, delay)
-    return () => clearInterval(interval)
-  }, [activeTab, scanStrategy, scanInterval, marketType, isScanning])
 
   useEffect(() => {
     localStorage.setItem('market_type', marketType)
