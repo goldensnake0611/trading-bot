@@ -722,6 +722,10 @@ export default function Dashboard() {
                           return
                         }
                         setSelectedScanIndex(absIndex)
+                        navigator.clipboard.writeText(r.symbol).then(() => {
+                          // Optional: You could show a small toast here if needed
+                          console.log('Copied to clipboard:', r.symbol)
+                        }).catch(err => console.error('Failed to copy:', err))
                       }}
                       onAuxClick={(e) => {
                         if (e.button === 1) {
@@ -763,7 +767,7 @@ export default function Dashboard() {
             </div>
             <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
               <p style={{ color: '#777', fontSize: '12px', margin: 0 }}>
-                Tip: Ctrl+Click or middle-click a row to open on MEXC in a new tab.
+                Tip: Click row to copy symbol. Ctrl+Click or middle-click to open on MEXC.
               </p>
               <Pagination 
                 currentPage={scanPage}
