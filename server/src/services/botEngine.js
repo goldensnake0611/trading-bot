@@ -241,6 +241,8 @@ export async function scanMarket(strategyId, marketType, interval, params = {}) 
 
   const results = []
   
+  const klineLimit = params.klineLimit ? Number(params.klineLimit) : 200
+
   // Process in batches to be nice to API
   const batchSize = 5
   for (let i = 0; i < symbols.length; i += batchSize) {
@@ -248,7 +250,7 @@ export async function scanMarket(strategyId, marketType, interval, params = {}) 
       await Promise.all(batch.map(async (symbol) => {
           try {
               const fetchFn = marketType === 'futures' ? fetchFuturesKlines : fetchKlines
-              const kl = await fetchFn(symbol, interval || '1m', 200) // Need enough for strategy
+              const kl = await fetchFn(symbol, interval || '1m', klineLimit)
               if (!kl || kl.length < 50) return
 
               console.log(i, ">>>>> length of kl>>>>>", kl.length)

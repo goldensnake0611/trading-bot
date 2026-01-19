@@ -193,11 +193,11 @@ export async function getKlines(req, res) {
 }
 
 export async function scanMarket(req, res) {
-  const { strategy, marketType, interval, volatilityThreshold } = req.body
+  const { strategy, marketType, interval, volatilityThreshold, klineLimit } = req.body
   if (!strategy) return res.status(400).json({ error: 'Missing strategy' })
   
   try {
-    const results = await botEngine.scanMarket(strategy, marketType || 'spot', interval || '1m', { volatilityThreshold })
+    const results = await botEngine.scanMarket(strategy, marketType || 'spot', interval || '1m', { volatilityThreshold, klineLimit })
     res.json(results)
   } catch(e) {
     console.error('Scan failed:', e)

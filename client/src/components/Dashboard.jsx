@@ -118,6 +118,7 @@ export default function Dashboard() {
   const [scanLimit, setScanLimit] = useState(10)
   const [selectedScanIndex, setSelectedScanIndex] = useState(null)
   const [volatilityThreshold, setVolatilityThreshold] = useState(40)
+  const [scanKlineLimit, setScanKlineLimit] = useState(200)
 
 
 
@@ -174,7 +175,8 @@ export default function Dashboard() {
           strategy: scanStrategy, 
           marketType, 
           interval: scanInterval,
-          volatilityThreshold: volatilityThreshold / 100
+          volatilityThreshold: volatilityThreshold / 100,
+          klineLimit: scanStrategy === 'volatility-swing' ? scanKlineLimit : undefined
         })
       })
       if (res.ok) {
@@ -515,6 +517,38 @@ export default function Dashboard() {
     ? ((historyStats.wins / (historyStats.wins + historyStats.losses)) * 100).toFixed(1) 
     : 0
 
+  function copyToClipboard(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(() => {
+        console.log('Copied to clipboard:', text)
+      }).catch(err => {
+        console.error('Async copy failed, trying fallback:', err)
+        fallbackCopy(text)
+      })
+    } else {
+      fallbackCopy(text)
+    }
+  }
+
+  function fallbackCopy(text) {
+    try {
+      const textArea = document.createElement("textarea")
+      textArea.value = text
+      textArea.style.position = "fixed"
+      textArea.style.left = "-9999px"
+      textArea.style.top = "0"
+      document.body.appendChild(textArea)
+      textArea.focus()
+      textArea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textArea)
+      console.log('Fallback copy successful')
+    } catch (err) {
+      console.error('Fallback copy failed:', err)
+      alert('Failed to copy to clipboard')
+    }
+  }
+
   return (
     <div className="container">
       <div className="card">
@@ -656,16 +690,28 @@ export default function Dashboard() {
               </label>
 
               {scanStrategy === 'volatility-swing' && (
-                <label>
-                  Threshold (%)
-                  <input 
-                    type="number" 
-                    value={volatilityThreshold} 
-                    onChange={e => setVolatilityThreshold(e.target.value)} 
-                    step="1" 
-                    style={{ width: '100%' }}
-                  />
-                </label>
+                <>
+                  <label>
+                    Threshold (%)
+                    <input 
+                      type="number" 
+                      value={volatilityThreshold} 
+                      onChange={e => setVolatilityThreshold(e.target.value)} 
+                      step="1" 
+                      style={{ width: '100%' }}
+                    />
+                  </label>
+                  <label>
+                    Klines
+                    <input 
+                      type="number" 
+                      value={scanKlineLimit} 
+                      onChange={e => setScanKlineLimit(Number(e.target.value) || 0)} 
+                      step="50" 
+                      style={{ width: '100%' }}
+                    />
+                  </label>
+                </>
               )}
               
               <label>
@@ -722,10 +768,8 @@ export default function Dashboard() {
                           return
                         }
                         setSelectedScanIndex(absIndex)
-                        navigator.clipboard.writeText(r.symbol).then(() => {
-                          // Optional: You could show a small toast here if needed
-                          console.log('Copied to clipboard:', r.symbol)
-                        }).catch(err => console.error('Failed to copy:', err))
+                        const symbolToCopy = r.symbol.replace('USDT', '')
+                        copyToClipboard(symbolToCopy)
                       }}
                       onAuxClick={(e) => {
                         if (e.button === 1) {
@@ -746,7 +790,6 @@ export default function Dashboard() {
                           target="_blank" 
                           rel="noopener noreferrer"
                           style={{ color: '#fff', textDecoration: 'underline' }}
-                          onClick={e => e.stopPropagation()}
                         >
                           {r.symbol}
                         </a>
