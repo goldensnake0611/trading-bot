@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { Info, X } from 'lucide-react'
 import SymbolSearch from './SymbolSearch'
@@ -119,6 +119,7 @@ export default function Dashboard() {
   const [selectedScanIndex, setSelectedScanIndex] = useState(null)
   const [volatilityThreshold, setVolatilityThreshold] = useState(40)
   const [scanKlineLimit, setScanKlineLimit] = useState(200)
+  const [autoRefresh, setAutoRefresh] = useState(false)
 
 
 
@@ -163,7 +164,7 @@ export default function Dashboard() {
     return () => clearInterval(interval)
   }, [activeTab])
 
-  async function handleScan() {
+  const handleScan = useCallback(async () => {
     setIsScanning(true)
     setScanResults([])
     setScanPage(1)
@@ -191,7 +192,18 @@ export default function Dashboard() {
     } finally {
       setIsScanning(false)
     }
-  }
+  }, [scanStrategy, marketType, scanInterval, volatilityThreshold, scanKlineLimit])
+
+  // Auto Refresh Effect
+  useEffect(() => {
+    let interval
+    if (activeTab === 'scanner' && autoRefresh) {
+      interval = setInterval(() => {
+        handleScan()
+      }, 30000) // 30 seconds
+    }
+    return () => clearInterval(interval)
+  }, [activeTab, autoRefresh, handleScan])
 
   async function refreshSystemLogs() {
     try {
@@ -669,7 +681,15 @@ export default function Dashboard() {
 
         {activeTab === 'scanner' && (
           <div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '15px', marginBottom: '12px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', userSelect: 'none', color: '#ccc', fontSize: '14px' }}>
+                <input 
+                  type="checkbox" 
+                  checked={autoRefresh} 
+                  onChange={e => setAutoRefresh(e.target.checked)} 
+                />
+                Auto Refresh (30s)
+              </label>
               <button 
                 onClick={handleScan} 
                 className="btn-primary" 
