@@ -200,7 +200,7 @@ export default function Dashboard() {
     if (activeTab === 'scanner' && autoRefresh) {
       interval = setInterval(() => {
         handleScan()
-      }, 30000) // 30 seconds
+      }, 300000) // 5 minutes
     }
     return () => clearInterval(interval)
   }, [activeTab, autoRefresh, handleScan])
@@ -681,24 +681,6 @@ export default function Dashboard() {
 
         {activeTab === 'scanner' && (
           <div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '15px', marginBottom: '12px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', userSelect: 'none', color: '#ccc', fontSize: '14px' }}>
-                <input 
-                  type="checkbox" 
-                  checked={autoRefresh} 
-                  onChange={e => setAutoRefresh(e.target.checked)} 
-                />
-                Auto Refresh (30s)
-              </label>
-              <button 
-                onClick={handleScan} 
-                className="btn-primary" 
-                disabled={isScanning}
-                style={{ height: '38px', minWidth: '120px' }}
-              >
-                {isScanning ? 'Scanning...' : 'Scan Market'}
-              </button>
-            </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', alignItems: 'end', marginBottom: '20px' }}>
               <label>
                 Strategy
@@ -745,6 +727,67 @@ export default function Dashboard() {
                   <option value="4h">4 Hours</option>
                   <option value="1d">1 Day</option>
                 </select>
+              </label>
+            </div>
+
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              marginBottom: '20px',
+              background: 'rgba(255,255,255,0.03)',
+              padding: '15px',
+              borderRadius: '12px',
+              border: '1px solid rgba(255,255,255,0.05)'
+            }}>
+              <button 
+                onClick={handleScan} 
+                className="btn-primary" 
+                disabled={isScanning}
+                style={{ 
+                  height: '42px', 
+                  minWidth: '160px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  letterSpacing: '0.5px',
+                  boxShadow: isScanning ? 'none' : '0 4px 12px rgba(212, 106, 132, 0.3)'
+                }}
+              >
+                {isScanning ? (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span className="spinner" style={{ width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', display: 'inline-block', animation: 'spin 1s linear infinite' }}></span>
+                    Scanning...
+                  </span>
+                ) : 'Scan Market'}
+              </button>
+
+              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '12px' }}>
+                <div style={{ 
+                  position: 'relative', 
+                  width: '44px', 
+                  height: '24px', 
+                  background: autoRefresh ? '#d46a84' : '#333', 
+                  borderRadius: '99px', 
+                  transition: 'background 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.3)'
+                }}>
+                  <div style={{ 
+                    position: 'absolute', 
+                    top: '2px', 
+                    left: autoRefresh ? '22px' : '2px', 
+                    width: '20px', 
+                    height: '20px', 
+                    background: '#fff', 
+                    borderRadius: '50%', 
+                    transition: 'left 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                  }} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ color: '#fff', fontSize: '14px', fontWeight: '500' }}>Auto Refresh</span>
+                  <span style={{ color: '#888', fontSize: '11px' }}>Every 5 minutes</span>
+                </div>
+                <input type="checkbox" checked={autoRefresh} onChange={e => setAutoRefresh(e.target.checked)} style={{ display: 'none' }} />
               </label>
             </div>
             
