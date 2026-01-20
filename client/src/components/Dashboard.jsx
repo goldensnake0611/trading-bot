@@ -14,6 +14,10 @@ function EditPositionModal({ position, onClose, onSave }) {
     onSave(position.id, tp, sl)
   }
 
+  const filteredScanResults = scanResults.filter(r => 
+    scanActionFilter === 'All' || r.action === scanActionFilter
+  )
+
   return (
     <div style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -120,6 +124,7 @@ export default function Dashboard() {
   const [volatilityThreshold, setVolatilityThreshold] = useState(40)
   const [scanKlineLimit, setScanKlineLimit] = useState(200)
   const [autoRefresh, setAutoRefresh] = useState(false)
+  const [scanActionFilter, setScanActionFilter] = useState('All')
 
 
 
@@ -802,7 +807,35 @@ export default function Dashboard() {
               <table>
                 <thead>
                   <tr>
-                    <th>Symbol</th><th>Price</th><th>Action</th><th>Indicators</th>
+                    <th>Symbol</th>
+                    <th>Price</th>
+                    <th style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      Action
+                      <select
+                        value={scanActionFilter}
+                        onChange={(e) => {
+                          setScanActionFilter(e.target.value)
+                          setScanPage(1)
+                        }}
+                        style={{
+                          background: '#2a2d3d',
+                          color: '#fff',
+                          border: '1px solid #444',
+                          borderRadius: '4px',
+                          fontSize: '11px',
+                          padding: '2px 4px',
+                          cursor: 'pointer',
+                          outline: 'none',
+                          fontWeight: 'normal'
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <option value="All">All</option>
+                        <option value="BUY">Buy</option>
+                        <option value="SELL">Sell</option>
+                      </select>
+                    </th>
+                    <th>Indicators</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -820,7 +853,7 @@ export default function Dashboard() {
                       </td>
                     </tr>
                   )}
-                  {scanResults
+                  {filteredScanResults
                     .slice((scanPage - 1) * scanLimit, scanPage * scanLimit)
                     .map((r, i) => {
                       const absIndex = (scanPage - 1) * scanLimit + i
@@ -880,7 +913,7 @@ export default function Dashboard() {
               </p>
               <Pagination 
                 currentPage={scanPage}
-                totalItems={scanResults.length}
+                totalItems={filteredScanResults.length}
                 pageSize={scanLimit}
                 onPageChange={setScanPage}
                 onPageSizeChange={setScanLimit}
