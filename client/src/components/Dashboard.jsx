@@ -848,9 +848,7 @@ export default function Dashboard() {
                 )) : (
                   <>
                     <option value="trend-following">Trend Following (Safe)</option>
-                    <option value="rsi-ema-pullback">RSI + EMA Pullback</option>
                     <option value="vwap-scalping">VWAP Scalping</option>
-                    <option value="dca">DCA (Dollar Cost Averaging)</option>
                     <option value="ema-crossover">EMA Crossover (Simple)</option>
                   </>
                 )}
