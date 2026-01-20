@@ -1,7 +1,7 @@
 import { ema, rsi } from '../utils/math.js'
 
 export const name = 'RSI + EMA Trend'
-export const description = 'Buy: Price < EMA9 < EMA50, Gap decreasing, RSI < 40. Sell: Price > EMA9 > EMA50, Gap decreasing, RSI > 65.'
+export const description = 'Buy: Price < EMA9 < EMA50, Gap rising, RSI < 40. Sell: Price > EMA9 > EMA50, Gap rising, RSI > 65.'
 
 export function analyze(klines) {
   // We need enough data for EMA 50 and RSI 14
@@ -40,11 +40,11 @@ export function analyze(klines) {
   // 2. EMA 9 is below EMA 50
   const buyCond2 = ema9_current < ema50_current
   
-  // 3. The gap between EMA 9 and EMA 50 is decreasing
+  // 3. The gap between EMA 9 and EMA 50 is rising
   // Gap = EMA 50 - EMA 9 (since EMA 9 < EMA 50)
   const gap_current_buy = ema50_current - ema9_current
   const gap_prev_buy = ema50_prev - ema9_prev
-  const buyCond3 = gap_current_buy < gap_prev_buy
+  const buyCond3 = gap_current_buy > gap_prev_buy
   
   // 4. RSI, EMA 9, and EMA 50 are all decreasing
   const buyCond4 = rsi_current < rsi_prev && ema9_current < ema9_prev && ema50_current < ema50_prev
@@ -73,11 +73,11 @@ export function analyze(klines) {
   // 2. EMA 9 is above EMA 50
   const sellCond2 = ema9_current > ema50_current
   
-  // 3. The gap between EMA 9 and EMA 50 is decreasing
+  // 3. The gap between EMA 9 and EMA 50 is rising
   // Gap = EMA 9 - EMA 50 (since EMA 9 > EMA 50)
   const gap_current_sell = ema9_current - ema50_current
   const gap_prev_sell = ema9_prev - ema50_prev
-  const sellCond3 = gap_current_sell < gap_prev_sell
+  const sellCond3 = gap_current_sell > gap_prev_sell
   
   // 4. RSI, EMA 9, and EMA 50 are all rising
   const sellCond4 = rsi_current > rsi_prev && ema9_current > ema9_prev && ema50_current > ema50_prev
