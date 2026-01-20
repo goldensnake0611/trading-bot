@@ -53,7 +53,15 @@ export function analyze(klines) {
   const buyCond5 = rsi_current < 40
   
   if (buyCond1 && buyCond2 && buyCond3 && buyCond4 && buyCond5) {
-    return { action: 'BUY', price }
+    return { 
+      action: 'BUY', 
+      price,
+      indicators: {
+        rsi: rsi_current,
+        ema9: ema9_current,
+        ema50: ema50_current
+      }
+    }
   }
 
   // --------------------------
@@ -78,7 +86,15 @@ export function analyze(klines) {
   const sellCond5 = rsi_current > 65
 
   if (sellCond1 && sellCond2 && sellCond3 && sellCond4 && sellCond5) {
-    return { action: 'SELL', price }
+    return { 
+      action: 'SELL', 
+      price,
+      indicators: {
+        rsi: rsi_current,
+        ema9: ema9_current,
+        ema50: ema50_current
+      }
+    }
   }
 
   return { action: 'HOLD' }
