@@ -14,10 +14,6 @@ function EditPositionModal({ position, onClose, onSave }) {
     onSave(position.id, tp, sl)
   }
 
-  const filteredScanResults = scanResults.filter(r => 
-    scanActionFilter === 'All' || r.action === scanActionFilter
-  )
-
   return (
     <div style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -125,6 +121,7 @@ export default function Dashboard() {
   const [scanKlineLimit, setScanKlineLimit] = useState(200)
   const [autoRefresh, setAutoRefresh] = useState(false)
   const [scanActionFilter, setScanActionFilter] = useState('All')
+  const [showScanActionFilter, setShowScanActionFilter] = useState(false)
 
 
 
@@ -566,6 +563,10 @@ export default function Dashboard() {
     }
   }
 
+  const filteredScanResults = scanResults.filter(r => 
+    scanActionFilter === 'All' || r.action === scanActionFilter
+  )
+
   return (
     <div className="container">
       <div className="card">
@@ -696,7 +697,7 @@ export default function Dashboard() {
                 </select>
               </label>
 
-              {scanStrategy === 'volatility-swing' && (
+              {(scanStrategy === 'volatility-swing' || scanStrategy === 'rsi-ema-volatility') && (
                 <>
                   <label>
                     Threshold (%)
@@ -809,31 +810,58 @@ export default function Dashboard() {
                   <tr>
                     <th>Symbol</th>
                     <th>Price</th>
-                    <th style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      Action
-                      <select
-                        value={scanActionFilter}
-                        onChange={(e) => {
-                          setScanActionFilter(e.target.value)
-                          setScanPage(1)
+                    <th style={{ position: 'relative', cursor: 'pointer', minWidth: '80px' }}>
+                      <div 
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setShowScanActionFilter(!showScanActionFilter)
                         }}
-                        style={{
-                          background: '#2a2d3d',
-                          color: '#fff',
-                          border: '1px solid #444',
-                          borderRadius: '4px',
-                          fontSize: '11px',
-                          padding: '2px 4px',
-                          cursor: 'pointer',
-                          outline: 'none',
-                          fontWeight: 'normal'
-                        }}
-                        onClick={(e) => e.stopPropagation()}
+                        style={{ display: 'flex', alignItems: 'center', gap: '5px' }}
                       >
-                        <option value="All">All</option>
-                        <option value="BUY">Buy</option>
-                        <option value="SELL">Sell</option>
-                      </select>
+                        Action
+                        <span style={{ fontSize: '10px', transform: showScanActionFilter ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>▼</span>
+                        {scanActionFilter !== 'All' && <span style={{ fontSize: '10px', color: '#d46a84' }}>({scanActionFilter === 'BUY' ? 'Buy' : 'Sell'})</span>}
+                      </div>
+
+                      {showScanActionFilter && (
+                        <div style={{
+                          position: 'absolute',
+                          top: '100%',
+                          left: 0,
+                          marginTop: '5px',
+                          background: '#1e2030',
+                          border: '1px solid #444',
+                          borderRadius: '6px',
+                          zIndex: 100,
+                          minWidth: '100px',
+                          boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+                          overflow: 'hidden'
+                        }}>
+                          {['All', 'BUY', 'SELL'].map(opt => (
+                            <div 
+                              key={opt}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setScanActionFilter(opt)
+                                setScanPage(1)
+                                setShowScanActionFilter(false)
+                              }}
+                              style={{
+                                padding: '10px 15px',
+                                color: scanActionFilter === opt ? '#d46a84' : '#eee',
+                                cursor: 'pointer',
+                                fontSize: '13px',
+                                borderBottom: opt !== 'SELL' ? '1px solid #2a2d3d' : 'none',
+                                fontWeight: scanActionFilter === opt ? 'bold' : 'normal'
+                              }}
+                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#2a2d3d'}
+                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                            >
+                              {opt === 'All' ? 'All' : (opt === 'BUY' ? 'Buy' : 'Sell')}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </th>
                     <th>Indicators</th>
                   </tr>
@@ -954,7 +982,7 @@ export default function Dashboard() {
               </select>
             </label>
 
-            {strategy === 'volatility-swing' && (
+            {(strategy === 'volatility-swing' || strategy === 'rsi-ema-volatility') && (
               <label style={{ marginTop: '10px' }}>
                 Volatility Threshold (%)
                 <input 

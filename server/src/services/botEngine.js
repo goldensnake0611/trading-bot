@@ -11,13 +11,15 @@ import * as trendFollowing from '../strategies/trendFollowing.js'
 import * as rsiEmaTrendStrategy from '../strategies/rsiEmaTrendStrategy.js'
 import * as vwapScalping from '../strategies/vwapScalping.js'
 import * as volatilitySwing from '../strategies/volatilitySwing.js'
+import * as rsiEmaVolatility from '../strategies/rsiEmaVolatilityStrategy.js'
 
 const strategies = {
   'ema-crossover': emaCrossover,
   'trend-following': trendFollowing,
   'rsi-ema-trend': rsiEmaTrendStrategy,
   'vwap-scalping': vwapScalping,
-  'volatility-swing': volatilitySwing
+  'volatility-swing': volatilitySwing,
+  'rsi-ema-volatility': rsiEmaVolatility
 }
 
 export function getAvailableStrategies() {
