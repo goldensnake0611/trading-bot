@@ -32,6 +32,7 @@ export function analyze(klines, botParams) {
     price < ema9_current &&
     ema9_current < ema50_current &&
     gap_current_buy > gap_prev_buy &&
+    rsi_current < rsi_prev &&
     rsi_current < 40
   )
 
@@ -41,6 +42,7 @@ export function analyze(klines, botParams) {
     price > ema9_current &&
     ema9_current > ema50_current &&
     gap_current_sell > gap_prev_sell &&
+    rsi_current > rsi_prev &&
     rsi_current > 65
   )
 
