@@ -2,59 +2,48 @@ import { useState, useEffect, useMemo } from 'react'
 import { ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Brush, ReferenceLine } from 'recharts'
 import SymbolSearch from './SymbolSearch'
 
-// Helper to calculate RSI Array
-function calculateRSI(closes, period = 14) {
-  if (closes.length < period + 1) return closes.map(() => null)
+// Helper to calculate VWAP Array (Rolling)
+function calculateVWAP(klines, period = 20) {
+  const vwapArray = []
+  let sumTPV = 0
+  let sumVol = 0
   
-  const rsiArray = []
-  let gains = 0
-  let losses = 0
-  
-  // Calculate initial average gain/loss
-  for (let i = 1; i <= period; i++) {
-    const diff = closes[i] - closes[i - 1]
-    if (diff >= 0) gains += diff
-    else losses += Math.abs(diff)
-  }
-  
-  let avgGain = gains / period
-  let avgLoss = losses / period
-  
-  // First RSI
-  let rs = avgLoss === 0 ? 100 : avgGain / avgLoss
-  let firstRsi = 100 - (100 / (1 + rs))
-  
-  // Fill nulls for initial period
-  for(let i=0; i<period; i++) rsiArray.push(null)
-  rsiArray.push(firstRsi)
-  
-  // Subsequent
-  for (let i = period + 1; i < closes.length; i++) {
-    const diff = closes[i] - closes[i - 1]
+  for (let i = 0; i < klines.length; i++) {
+    const k = klines[i]
+    const high = Number(k[2])
+    const low = Number(k[3])
+    const close = Number(k[4])
+    const vol = Number(k[5])
+    const tp = (high + low + close) / 3
     
-    if (diff >= 0) {
-      avgGain = (avgGain * (period - 1) + diff) / period
-      avgLoss = (avgLoss * (period - 1)) / period
-    } else {
-      avgGain = (avgGain * (period - 1)) / period
-      avgLoss = (avgLoss * (period - 1) + Math.abs(diff)) / period
+    sumTPV += tp * vol
+    sumVol += vol
+    
+    if (i >= period) {
+       const kOld = klines[i - period]
+       const hOld = Number(kOld[2])
+       const lOld = Number(kOld[3])
+       const cOld = Number(kOld[4])
+       const vOld = Number(kOld[5])
+       const tpOld = (hOld + lOld + cOld) / 3
+       
+       sumTPV -= tpOld * vOld
+       sumVol -= vOld
     }
     
-    if (avgLoss === 0) {
-      rsiArray.push(100)
+    if (i >= period - 1) {
+      vwapArray.push(sumVol ? sumTPV / sumVol : null)
     } else {
-      const rs = avgGain / avgLoss
-      rsiArray.push(100 - (100 / (1 + rs)))
+      vwapArray.push(null)
     }
   }
-  
-  return rsiArray
+  return vwapArray
 }
 
 export default function IndicatorAnalyzer() {
   const [symbol, setSymbol] = useState(localStorage.getItem('analyzer_symbol') || 'BTCUSDT')
   const [timeframe, setTimeframe] = useState(localStorage.getItem('analyzer_timeframe') || '1d')
-  const [period, setPeriod] = useState(Number(localStorage.getItem('analyzer_period')) || 14)
+  const [period, setPeriod] = useState(Number(localStorage.getItem('analyzer_period')) || 20)
   const [useFutures, setUseFutures] = useState(localStorage.getItem('analyzer_use_futures') === 'true')
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(false)
@@ -111,8 +100,7 @@ export default function IndicatorAnalyzer() {
                 return
             }
 
-            const closes = klines.map(k => Number(k[4]))
-            const rsiValues = calculateRSI(closes, Number(period))
+            const vwapValues = calculateVWAP(klines, Number(period))
             
             const chartData = klines.map((k, i) => ({
               time: Number(k[0]), // Store raw timestamp (number)
@@ -122,7 +110,7 @@ export default function IndicatorAnalyzer() {
               close: Number(k[4]),
               price: Number(k[4]), // Ensure 'price' exists for the chart
               vol: Number(k[5]),
-              rsi: rsiValues[i]
+              vwap: vwapValues[i]
             }))
             
             setData(chartData)
@@ -156,9 +144,9 @@ export default function IndicatorAnalyzer() {
               <span>Price: </span>
               <span>{d.close}</span>
             </p>
-            <p className="text-purple-400">
-              <span>RSI: </span>
-              <span>{d.rsi ? d.rsi.toFixed(2) : 'N/A'}</span>
+            <p className="text-orange-400">
+              <span>VWAP: </span>
+              <span>{d.vwap ? d.vwap.toFixed(2) : 'N/A'}</span>
             </p>
           </div>
         </div>
@@ -203,9 +191,9 @@ export default function IndicatorAnalyzer() {
               ))}
             </select>
 
-            {/* RSI */}
+            {/* VWAP Length */}
             <div className="flex items-center gap-3 bg-[#0f111a] border border-gray-700 rounded px-3 py-2 hover:border-gray-600 transition-colors shrink-0">
-              <span className="text-gray-500 text-xs font-bold uppercase tracking-wider">RSI</span>
+              <span className="text-gray-500 text-xs font-bold uppercase tracking-wider">VWAP Len</span>
               <input 
                 type="number" 
                 value={period} 
@@ -274,12 +262,9 @@ export default function IndicatorAnalyzer() {
                 tickFormatter={formatXAxis}
                 minTickGap={50}
               />
-              <YAxis yAxisId="rsi" domain={[0, 100]} tick={{ fill: '#888' }} label={{ value: 'RSI', angle: -90, position: 'insideLeft', fill: '#888' }} />
               <YAxis yAxisId="price" orientation="right" domain={['auto', 'auto']} tick={{ fill: '#888' }} />
               <Tooltip content={<CustomTooltip />} />
               <Legend />
-              <ReferenceLine y={70} yAxisId="rsi" stroke="#ff4d4d" strokeDasharray="3 3" label="Overbought (70)" />
-              <ReferenceLine y={30} yAxisId="rsi" stroke="#4caf50" strokeDasharray="3 3" label="Oversold (30)" />
               {currentPrice && (
                 <ReferenceLine 
                   y={currentPrice} 
@@ -291,13 +276,13 @@ export default function IndicatorAnalyzer() {
               )}
               
               <Line 
-                yAxisId="rsi"
+                yAxisId="price"
                 type="monotone" 
-                dataKey="rsi" 
-                stroke="#8884d8" 
+                dataKey="vwap" 
+                stroke="#ff9f43" 
                 strokeWidth={2}
                 dot={false} 
-                name={`RSI (${period})`}
+                name={`VWAP (${period})`}
                 connectNulls
               />
               

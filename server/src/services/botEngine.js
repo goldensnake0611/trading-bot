@@ -251,19 +251,24 @@ export async function scanMarket(strategyId, marketType, interval, params = {}) 
               const kl = await fetchFn(symbol, interval || '1m', klineLimit)
               if (!kl || kl.length < 50) return
 
-              console.log(i, ">>>>> length of kl>>>>>", kl.length)
               // Normalize klines/closes for strategy
               // Existing strategies might use `closes` or `klines`. 
               // We need to support both or standardize.
               // Most strategies we saw use `analyze(klines)` or `analyze(closes)`.
               // `trendFollowing` uses `klines`. `emaCrossover` uses `closes`.
               
+              const strategyParams = { ...params }
+              if (strategyId === 'rsi-ema-volatility') {
+                  const klines5m = await fetchFn(symbol, '5m')
+                  strategyParams.klines5m = klines5m
+              }
+
               let res
               if (strategyId === 'ema-crossover') {
                   const closes = kl.map(k => Number(k[4]))
-                  res = strategyModule.analyze(closes, params)
+                  res = strategyModule.analyze(closes, strategyParams)
               } else {
-                  res = strategyModule.analyze(kl, params)
+                  res = strategyModule.analyze(kl, strategyParams)
               }
 
               if (res.action !== 'HOLD') {
@@ -688,6 +693,12 @@ async function strategyTick(bot) {
    
   const fetchFn = bot.marketType === 'futures' ? fetchFuturesKlines : fetchKlines
   const kl = await fetchFn(symbol, interval)
+
+  // Special handling for rsi-ema-volatility: Fetch 5m candles for RSI+EMA indicators
+  if (strategy === 'rsi-ema-volatility') {
+    const klines5m = await fetchFn(symbol, '5m')
+    bot.klines5m = klines5m
+  }
 
   // Spot klines: [time, open, high, low, close, vol, ...]
   if (!Array.isArray(kl) || kl.length < 200) return // Need enough history for EMA200
