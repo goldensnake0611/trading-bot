@@ -42,7 +42,7 @@ export function analyze(klines, botParams) {
     gap_EMA9_buy &&
     gap_EMA50_buy &&
     rsi_current < rsi_prev &&
-    rsi_current < 40
+    rsi_current < 35
   )
 
   // RSI+EMA Sell Conditions (Price > EMA9 > EMA50 on 5m chart)
@@ -50,7 +50,7 @@ export function analyze(klines, botParams) {
     gap_EMA9_sell &&
     gap_EMA50_sell &&
     rsi_current > rsi_prev &&
-    rsi_current > 65
+    rsi_current > 70
   )
 
   // 2. Volatility Swing Analysis (Uses User Selected Interval)
