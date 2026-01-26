@@ -28,29 +28,27 @@ export function analyze(klines, botParams) {
   const rsi_current = rsi(closes5m, 14)
   const rsi_prev = rsi(closes5m.slice(0, -1), 14)
 
-  const gap_current_buy = ema50_current - ema9_current
-  const gap_prev_buy = ema50_prev - ema9_prev
+  const gap_EMA9_buy = ema9_current - ema9_prev < 0 // EMA9 is below previous EMA9
+  const gap_EMA50_buy = ema50_current - ema50_prev < 0 // EMA50 is below previous EMA50
   
-  const gap_current_sell = ema9_current - ema50_current
-  const gap_prev_sell = ema9_prev - ema50_prev
+  const gap_EMA9_sell = ema9_current - ema9_prev > 0 // EMA9 is above previous EMA9
+  const gap_EMA50_sell = ema50_current - ema50_prev > 0 // EMA50 is above previous EMA50
 
   // Use the LATEST price from the main feed for execution checks
   const currentPrice = Number(klines.at(-1)[4])
 
   // RSI+EMA Buy Conditions (Price < EMA9 < EMA50 on 5m chart)
   const rsiEmaBuy = (
-    currentPrice < ema9_current &&
-    ema9_current < ema50_current &&
-    gap_current_buy > gap_prev_buy &&
+    gap_EMA9_buy &&
+    gap_EMA50_buy &&
     rsi_current < rsi_prev &&
     rsi_current < 40
   )
 
   // RSI+EMA Sell Conditions (Price > EMA9 > EMA50 on 5m chart)
   const rsiEmaSell = (
-    currentPrice > ema9_current &&
-    ema9_current > ema50_current &&
-    gap_current_sell > gap_prev_sell &&
+    gap_EMA9_sell &&
+    gap_EMA50_sell &&
     rsi_current > rsi_prev &&
     rsi_current > 65
   )
