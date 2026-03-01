@@ -1,32 +1,32 @@
 import { ema, rsi } from '../utils/math.js'
 
 export const name = 'RSI + EMA + Volatility Swing'
-export const description = 'Combines RSI+EMA (always 5m) trend reversal signals with Volatility Swing (user interval) percentage drops/rises.'
+export const description = 'Combines RSI+EMA (user interval) trend reversal signals with Volatility Swing (user interval) percentage drops/rises.'
 // export const interval = '5m' // Removed so it uses user selected interval for the main loop
 
 export function analyze(klines, botParams) {
   // `klines`: Main timeframe (User selected, e.g. 1h) -> Used for Volatility
-  // `botParams.klines5m`: 5m timeframe -> Used for RSI + EMA
+  // `botParams.klinesRsi`: RSI timeframe (User selected, e.g. 5m) -> Used for RSI + EMA
 
   // Ensure we have enough data for volatility
   if (klines.length < 50) return { action: 'HOLD' }
 
-  // 1. RSI + EMA Analysis (Uses 5m data)
+  // 1. RSI + EMA Analysis (Uses User Selected RSI data)
   // ------------------------------------
-  const klines5m = (botParams && botParams.klines5m) ? botParams.klines5m : klines // Fallback if missing
+  const klinesRsi = (botParams && botParams.klinesRsi) ? botParams.klinesRsi : klines // Fallback if missing
   
-  if (klines5m.length < 60) return { action: 'HOLD' } // Need enough for EMA50
+  if (klinesRsi.length < 60) return { action: 'HOLD' } // Need enough for EMA50
 
-  const closes5m = klines5m.map(k => Number(k[4]))
-  const last5m = closes5m.length - 1
-  // const price5m = closes5m[last5m] // Price should be roughly same, but let's use current price from main klines for trade execution
+  const closesRsi = klinesRsi.map(k => Number(k[4]))
+  const lastRsi = closesRsi.length - 1
+  // const priceRsi = closesRsi[lastRsi] // Price should be roughly same, but let's use current price from main klines for trade execution
 
-  const ema9_current = ema(closes5m, 9)
-  const ema9_prev = ema(closes5m.slice(0, -1), 9)
-  const ema50_current = ema(closes5m, 50)
-  const ema50_prev = ema(closes5m.slice(0, -1), 50)
-  const rsi_current = rsi(closes5m, 14)
-  const rsi_prev = rsi(closes5m.slice(0, -1), 14)
+  const ema9_current = ema(closesRsi, 9)
+  const ema9_prev = ema(closesRsi.slice(0, -1), 9)
+  const ema50_current = ema(closesRsi, 50)
+  const ema50_prev = ema(closesRsi.slice(0, -1), 50)
+  const rsi_current = rsi(closesRsi, 14)
+  const rsi_prev = rsi(closesRsi.slice(0, -1), 14)
 
   const gap_EMA9_buy = ema9_current - ema9_prev < 0 // EMA9 is below previous EMA9
   const gap_EMA50_buy = ema50_current - ema50_prev < 0 // EMA50 is below previous EMA50
@@ -72,10 +72,12 @@ export function analyze(klines, botParams) {
   const volBuy = dropPct > threshold
   const volSell = risePct > threshold
 
+  const volGap = dropPct > threshold || risePct > threshold
+
   // 3. Combine
   // ----------
   
-  if (rsiEmaBuy && volBuy) {
+  if (rsiEmaBuy && volGap) {
      return { 
       action: 'BUY', 
       price: currentPrice,
@@ -90,7 +92,7 @@ export function analyze(klines, botParams) {
     }
   }
 
-  if (rsiEmaSell && volSell) {
+  if (rsiEmaSell && volGap) {
     return { 
       action: 'SELL', 
       price: currentPrice,

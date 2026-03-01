@@ -3,7 +3,7 @@ import * as botEngine from '../services/botEngine.js'
 
 export async function startBot(req, res) {
   console.log('Received start request:', req.body)
-  const { apiKey, apiSecret, symbol, vol, tpPct, slPct, strategy, autoSell, isPaperTrading, immediate, marketType, interval, volatilityThreshold } = req.body
+  const { apiKey, apiSecret, symbol, vol, tpPct, slPct, strategy, autoSell, isPaperTrading, immediate, marketType, interval, volatilityThreshold, rsiInterval } = req.body
   const resolvedKey = apiKey || process.env.MEXC_API_KEY
   const resolvedSecret = apiSecret || process.env.MEXC_API_SECRET
   
@@ -25,7 +25,8 @@ export async function startBot(req, res) {
     immediate,
     marketType,
     interval,
-    volatilityThreshold
+    volatilityThreshold,
+    rsiInterval
   })
   
   return res.json({ id })
@@ -193,11 +194,11 @@ export async function getKlines(req, res) {
 }
 
 export async function scanMarket(req, res) {
-  const { strategy, marketType, interval, volatilityThreshold, klineLimit } = req.body
+  const { strategy, marketType, interval, volatilityThreshold, klineLimit, rsiInterval } = req.body
   if (!strategy) return res.status(400).json({ error: 'Missing strategy' })
   
   try {
-    const results = await botEngine.scanMarket(strategy, marketType || 'spot', interval || '1m', { volatilityThreshold, klineLimit })
+    const results = await botEngine.scanMarket(strategy, marketType || 'spot', interval || '1m', { volatilityThreshold, klineLimit, rsiInterval })
     res.json(results)
   } catch(e) {
     console.error('Scan failed:', e)

@@ -259,8 +259,9 @@ export async function scanMarket(strategyId, marketType, interval, params = {}) 
               
               const strategyParams = { ...params }
               if (strategyId === 'rsi-ema-volatility') {
-                  const klines5m = await fetchFn(symbol, '5m')
-                  strategyParams.klines5m = klines5m
+                  const rsiInterval = params.rsiInterval || '5m'
+                  const klinesRsi = await fetchFn(symbol, rsiInterval)
+                  strategyParams.klinesRsi = klinesRsi
               }
 
               let res
@@ -291,10 +292,10 @@ export async function scanMarket(strategyId, marketType, interval, params = {}) 
   return results
 }
 
-export async function startBot({ apiKey, secretKey, symbol, vol, tpPct, slPct, strategy, autoSell, isPaperTrading, immediate, marketType, interval, volatilityThreshold }) {
+export async function startBot({ apiKey, secretKey, symbol, vol, tpPct, slPct, strategy, autoSell, isPaperTrading, immediate, marketType, interval, volatilityThreshold, rsiInterval }) {
   const id = `${symbol}:${Date.now()}`
   
-  console.log('Starting bot with ID:', id, 'Strategy:', strategy, 'Mode:', isPaperTrading ? 'Paper Trading' : 'Live', 'Market:', marketType || 'spot', 'Interval:', interval || 'default')
+  console.log('Starting bot with ID:', id, 'Strategy:', strategy, 'Mode:', isPaperTrading ? 'Paper Trading' : 'Live', 'Market:', marketType || 'spot', 'Interval:', interval || 'default', 'RSI Interval:', rsiInterval || 'default')
   
   const bot = {
     id,
@@ -306,6 +307,7 @@ export async function startBot({ apiKey, secretKey, symbol, vol, tpPct, slPct, s
     slPct: Number(slPct || 0.5),
     strategy: strategy || 'trend-following', // Default
     volatilityThreshold: volatilityThreshold ? Number(volatilityThreshold) : undefined,
+    rsiInterval: rsiInterval,
     autoSell: autoSell !== undefined ? !!autoSell : true,
     isPaperTrading: !!isPaperTrading,
     marketType: marketType || 'spot',
@@ -694,10 +696,11 @@ async function strategyTick(bot) {
   const fetchFn = bot.marketType === 'futures' ? fetchFuturesKlines : fetchKlines
   const kl = await fetchFn(symbol, interval)
 
-  // Special handling for rsi-ema-volatility: Fetch 5m candles for RSI+EMA indicators
+  // Special handling for rsi-ema-volatility: Fetch user-selected candles for RSI+EMA indicators
   if (strategy === 'rsi-ema-volatility') {
-    const klines5m = await fetchFn(symbol, '5m')
-    bot.klines5m = klines5m
+    const rsiInterval = bot.rsiInterval || '5m'
+    const klinesRsi = await fetchFn(symbol, rsiInterval)
+    bot.klinesRsi = klinesRsi
   }
 
   // Spot klines: [time, open, high, low, close, vol, ...]

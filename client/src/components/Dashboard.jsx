@@ -97,6 +97,7 @@ export default function Dashboard() {
   const [symbol, setSymbol] = useState('')
   const [strategy, setStrategy] = useState('trend-following')
   const [candleInterval, setCandleInterval] = useState('1m')
+  const [rsiInterval, setRsiInterval] = useState('5m')
   const [historyStrategyFilter, setHistoryStrategyFilter] = useState('All')
   const [vol, setVol] = useState(10)
   const [tpPct, setTpPct] = useState(1)
@@ -114,6 +115,7 @@ export default function Dashboard() {
   const [scanResults, setScanResults] = useState([])
   const [scanStrategy, setScanStrategy] = useState('trend-following')
   const [scanInterval, setScanInterval] = useState('1m')
+  const [scanRsiInterval, setScanRsiInterval] = useState('5m')
   const [scanPage, setScanPage] = useState(1)
   const [scanLimit, setScanLimit] = useState(10)
   const [selectedScanIndex, setSelectedScanIndex] = useState(null)
@@ -178,6 +180,7 @@ export default function Dashboard() {
           strategy: scanStrategy, 
           marketType, 
           interval: scanInterval,
+          rsiInterval: scanStrategy === 'rsi-ema-volatility' ? scanRsiInterval : undefined,
           volatilityThreshold: volatilityThreshold / 100,
           klineLimit: scanStrategy === 'volatility-swing' ? scanKlineLimit : undefined
         })
@@ -187,7 +190,7 @@ export default function Dashboard() {
       } else {
         const err = await res.json()
         alert('Scan failed: ' + err.error)
-      }
+      } 
     } catch(e) {
       console.error(e)
       alert('Network error')
@@ -282,6 +285,7 @@ export default function Dashboard() {
         isPaperTrading, 
         marketType, 
         interval: candleInterval,
+        rsiInterval,
         volatilityThreshold: volatilityThreshold / 100
       })
     })
@@ -709,6 +713,19 @@ export default function Dashboard() {
                       style={{ width: '100%' }}
                     />
                   </label>
+                  {scanStrategy === 'rsi-ema-volatility' && (
+                    <label>
+                      RSI Candle
+                      <select value={scanRsiInterval} onChange={e => setScanRsiInterval(e.target.value)} style={{ width: '100%' }}>
+                        <option value="1m">1 Minute</option>
+                        <option value="5m">5 Minutes</option>
+                        <option value="15m">15 Minutes</option>
+                        <option value="30m">30 Minutes</option>
+                        <option value="1h">1 Hour</option>
+                        <option value="4h">4 Hours</option>
+                      </select>
+                    </label>
+                  )}
                   <label>
                     Klines
                     <input 
@@ -991,6 +1008,20 @@ export default function Dashboard() {
                   onChange={e => setVolatilityThreshold(e.target.value)} 
                   step="1" 
                 />
+              </label>
+            )}
+
+            {strategy === 'rsi-ema-volatility' && (
+              <label style={{ marginTop: '10px' }}>
+                RSI Candle
+                <select value={rsiInterval} onChange={e => setRsiInterval(e.target.value)}>
+                  <option value="1m">1 Minute</option>
+                  <option value="5m">5 Minutes</option>
+                  <option value="15m">15 Minutes</option>
+                  <option value="30m">30 Minutes</option>
+                  <option value="1h">1 Hour</option>
+                  <option value="4h">4 Hours</option>
+                </select>
               </label>
             )}
 
