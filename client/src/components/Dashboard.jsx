@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { Info, X } from 'lucide-react'
 import SymbolSearch from './SymbolSearch'
@@ -124,6 +124,7 @@ export default function Dashboard() {
   const [autoRefresh, setAutoRefresh] = useState(false)
   const [scanActionFilter, setScanActionFilter] = useState('All')
   const [showScanActionFilter, setShowScanActionFilter] = useState(false)
+  const [selectedScanTokens, setSelectedScanTokens] = useState([])
 
 
 
@@ -209,6 +210,14 @@ export default function Dashboard() {
     }
     return () => clearInterval(interval)
   }, [activeTab, autoRefresh, handleScan])
+
+  useEffect(() => {
+    setSelectedScanTokens(prev => prev.map(t => {
+      const latest = scanResults.find(r => r.symbol === t.symbol)
+      if (!latest) return t
+      return { ...t, price: latest.price, action: latest.action }
+    }))
+  }, [scanResults])
 
   async function refreshSystemLogs() {
     try {
@@ -570,6 +579,21 @@ export default function Dashboard() {
   const filteredScanResults = scanResults.filter(r => 
     scanActionFilter === 'All' || r.action === scanActionFilter
   )
+  const selectedScanSymbols = useMemo(() => new Set(selectedScanTokens.map(t => t.symbol)), [selectedScanTokens])
+
+  function addSelectedScanToken(token) {
+    setSelectedScanTokens(prev => {
+      const idx = prev.findIndex(t => t.symbol === token.symbol)
+      if (idx === -1) return [...prev, token]
+      const next = prev.slice()
+      next[idx] = { ...next[idx], ...token }
+      return next
+    })
+  }
+
+  function removeSelectedScanToken(symbol) {
+    setSelectedScanTokens(prev => prev.filter(t => t.symbol !== symbol))
+  }
 
   return (
     <div className="container">
@@ -821,13 +845,16 @@ export default function Dashboard() {
               Scanning top liquid pairs for <strong>{marketType === 'futures' ? 'Futures' : 'Spot'}</strong> BUY signals. Double-click row to open on MEXC.
             </p>
 
-            <div className="table-wrapper">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Symbol</th>
-                    <th>Price</th>
-                    <th style={{ position: 'relative', cursor: 'pointer', minWidth: '80px' }}>
+            <div className="scan-layout">
+              <div>
+                <div className="table-wrapper">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th style={{ width: '44px' }}></th>
+                        <th>Symbol</th>
+                        <th>Price</th>
+                        <th style={{ position: 'relative', cursor: 'pointer', minWidth: '80px' }}>
                       <div 
                         onClick={(e) => {
                           e.stopPropagation()
@@ -879,90 +906,198 @@ export default function Dashboard() {
                           ))}
                         </div>
                       )}
-                    </th>
-                    <th>Indicators</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {scanResults.length === 0 && !isScanning && (
-                    <tr>
-                      <td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
-                        No opportunities found or scan not started.
-                      </td>
-                    </tr>
-                  )}
-                  {isScanning && (
-                    <tr>
-                      <td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#d46a84' }}>
-                        Scanning market... This may take a moment...
-                      </td>
-                    </tr>
-                  )}
-                  {filteredScanResults
-                    .slice((scanPage - 1) * scanLimit, scanPage * scanLimit)
-                    .map((r, i) => {
-                      const absIndex = (scanPage - 1) * scanLimit + i
-                      return (
-                    <tr 
-                      key={absIndex} 
-                      onClick={(e) => {
-                        if (e.ctrlKey || e.metaKey) {
-                          const url = buildMexcUrl(r.symbol)
-                          window.open(url, '_blank')
-                          return
-                        }
-                        setSelectedScanIndex(absIndex)
-                        const symbolToCopy = r.symbol.replace('USDT', '')
-                        copyToClipboard(symbolToCopy)
-                      }}
-                      onAuxClick={(e) => {
-                        if (e.button === 1) {
-                          const url = buildMexcUrl(r.symbol)
-                          window.open(url, '_blank')
-                        }
-                      }}
-                      onDoubleClick={() => handleRowDoubleClick(r.symbol)} 
-                      style={{ 
-                        cursor: 'pointer',
-                        backgroundColor: selectedScanIndex === absIndex ? 'rgba(255, 255, 255, 0.06)' : 'transparent'
-                      }}
-                      className="hover-row"
-                    >
-                      <td style={{ fontWeight: 'bold', color: '#fff' }}>
-                        <a 
-                          href={buildMexcUrl(r.symbol)} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          style={{ color: '#fff', textDecoration: 'underline' }}
+                        </th>
+                        <th>Indicators</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {scanResults.length === 0 && !isScanning && (
+                        <tr>
+                          <td colSpan="5" style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+                            No opportunities found or scan not started.
+                          </td>
+                        </tr>
+                      )}
+                      {isScanning && (
+                        <tr>
+                          <td colSpan="5" style={{ textAlign: 'center', padding: '20px', color: '#d46a84' }}>
+                            Scanning market... This may take a moment...
+                          </td>
+                        </tr>
+                      )}
+                      {filteredScanResults
+                        .slice((scanPage - 1) * scanLimit, scanPage * scanLimit)
+                        .map((r, i) => {
+                          const absIndex = (scanPage - 1) * scanLimit + i
+                          const isSelected = selectedScanSymbols.has(r.symbol)
+                          return (
+                        <tr 
+                          key={absIndex} 
+                          onClick={(e) => {
+                            if (e.ctrlKey || e.metaKey) {
+                              const url = buildMexcUrl(r.symbol)
+                              window.open(url, '_blank')
+                              return
+                            }
+                            setSelectedScanIndex(absIndex)
+                            const symbolToCopy = r.symbol.replace('USDT', '')
+                            copyToClipboard(symbolToCopy)
+                          }}
+                          onAuxClick={(e) => {
+                            if (e.button === 1) {
+                              const url = buildMexcUrl(r.symbol)
+                              window.open(url, '_blank')
+                            }
+                          }}
+                          onDoubleClick={() => handleRowDoubleClick(r.symbol)} 
+                          style={{ 
+                            cursor: 'pointer',
+                            backgroundColor: selectedScanIndex === absIndex ? 'rgba(255, 255, 255, 0.06)' : 'transparent'
+                          }}
+                          className="hover-row"
                         >
-                          {r.symbol}
-                        </a>
-                      </td>
-                      <td>{r.price}</td>
-                      <td style={{ color: r.action === 'SELL' ? '#ff4d4d' : '#4caf50', fontWeight: 'bold' }}>{r.action}</td>
-                      <td style={{ fontSize: '12px', color: '#aaa' }}>
-                        {Object.entries(r.indicators || {}).map(([k, v]) => (
-                          <span key={k} style={{ marginRight: '8px' }}>
-                            {k}: {typeof v === 'number' ? v.toFixed(4) : v}
-                          </span>
-                        ))}
-                      </td>
-                    </tr>
-                  )})}
-                </tbody>
-              </table>
-            </div>
-            <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
-              <p style={{ color: '#777', fontSize: '12px', margin: 0 }}>
-                Tip: Click row to copy symbol. Ctrl+Click or middle-click to open on MEXC.
-              </p>
-              <Pagination 
-                currentPage={scanPage}
-                totalItems={filteredScanResults.length}
-                pageSize={scanLimit}
-                onPageChange={setScanPage}
-                onPageSizeChange={setScanLimit}
-              />
+                          <td
+                            style={{ width: '44px' }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={(e) => {
+                                if (e.target.checked) addSelectedScanToken({ symbol: r.symbol, price: r.price, action: r.action })
+                                else removeSelectedScanToken(r.symbol)
+                              }}
+                              style={{
+                                width: '16px',
+                                height: '16px',
+                                margin: 0,
+                                accentColor: '#d46a84',
+                                cursor: 'pointer'
+                              }}
+                            />
+                          </td>
+                          <td style={{ fontWeight: 'bold', color: '#fff' }}>
+                            <a 
+                              href={buildMexcUrl(r.symbol)} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              style={{ color: '#fff', textDecoration: 'underline' }}
+                              onClick={e => e.stopPropagation()}
+                            >
+                              {r.symbol}
+                            </a>
+                          </td>
+                          <td>{r.price}</td>
+                          <td style={{ color: r.action === 'SELL' ? '#ff4d4d' : '#4caf50', fontWeight: 'bold' }}>{r.action}</td>
+                          <td style={{ fontSize: '12px', color: '#aaa' }}>
+                            {Object.entries(r.indicators || {}).map(([k, v]) => (
+                              <span key={k} style={{ marginRight: '8px' }}>
+                                {k}: {typeof v === 'number' ? v.toFixed(4) : v}
+                              </span>
+                            ))}
+                          </td>
+                        </tr>
+                      )})}
+                    </tbody>
+                  </table>
+                </div>
+                <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+                  <p style={{ color: '#777', fontSize: '12px', margin: 0 }}>
+                    Tip: Click row to copy symbol. Ctrl+Click or middle-click to open on MEXC.
+                  </p>
+                  <Pagination 
+                    currentPage={scanPage}
+                    totalItems={filteredScanResults.length}
+                    pageSize={scanLimit}
+                    onPageChange={setScanPage}
+                    onPageSizeChange={setScanLimit}
+                  />
+                </div>
+              </div>
+
+              <div className="scan-selected-panel">
+                <div className="scan-selected-header">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ color: '#eebbcc', fontWeight: 700, fontSize: '13px', letterSpacing: '0.5px' }}>Selected Tokens</div>
+                    <div className="scan-selected-count">{selectedScanTokens.length}</div>
+                  </div>
+                  {selectedScanTokens.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedScanTokens([])}
+                      style={{
+                        background: 'transparent',
+                        border: '1px solid rgba(212, 106, 132, 0.25)',
+                        color: '#d46a84',
+                        padding: '6px 10px',
+                        borderRadius: '999px',
+                        fontSize: '11px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+
+                {selectedScanTokens.length === 0 ? (
+                  <div className="scan-selected-empty">No tokens selected.</div>
+                ) : (
+                  <div className="scan-selected-list">
+                    {selectedScanTokens.map((t) => (
+                      <div key={t.symbol} className="scan-selected-item">
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ fontWeight: 700, color: '#fff', fontSize: '13px' }}>{t.symbol}</div>
+                            <div style={{ fontSize: '11px', color: t.action === 'SELL' ? '#ff4d4d' : '#4caf50', fontWeight: 700 }}>
+                              {t.action || '-'}
+                            </div>
+                          </div>
+                          <div style={{ fontSize: '11px', color: '#aaa', marginTop: '4px' }}>Price: {t.price ?? '-'}</div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const url = buildMexcUrl(t.symbol)
+                              window.open(url, '_blank')
+                            }}
+                            style={{
+                              background: 'rgba(255,255,255,0.04)',
+                              border: '1px solid rgba(255,255,255,0.08)',
+                              color: '#d0c4d8',
+                              padding: '6px 10px',
+                              borderRadius: '10px',
+                              fontSize: '11px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Open
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeSelectedScanToken(t.symbol)}
+                            style={{
+                              background: 'transparent',
+                              border: '1px solid rgba(255,255,255,0.08)',
+                              color: '#aaa',
+                              padding: '6px',
+                              borderRadius: '10px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                            aria-label={`Remove ${t.symbol}`}
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
