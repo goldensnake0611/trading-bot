@@ -56,6 +56,18 @@ input, select {
 }
 input:focus, select:focus { border-color: #a61e4d; outline: none; background: #08080c; box-shadow: 0 0 10px rgba(166, 30, 77, 0.2); }
 
+.scan-checkbox {
+  width: 16px !important;
+  height: 16px !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  appearance: auto !important;
+  -webkit-appearance: auto !important;
+  cursor: pointer;
+  accent-color: #d46a84;
+}
+
 .btn-primary { 
   background: linear-gradient(135deg, #701e38 0%, #4a148c 100%);
   border: none;

@@ -12,6 +12,7 @@ import * as rsiEmaTrendStrategy from '../strategies/rsiEmaTrendStrategy.js'
 import * as vwapScalping from '../strategies/vwapScalping.js'
 import * as volatilitySwing from '../strategies/volatilitySwing.js'
 import * as rsiEmaVolatility from '../strategies/rsiEmaVolatilityStrategy.js'
+import * as bullishCandlestick from '../strategies/bullishCandlestick.js'
 
 const strategies = {
   'ema-crossover': emaCrossover,
@@ -19,7 +20,8 @@ const strategies = {
   'rsi-ema-trend': rsiEmaTrendStrategy,
   'vwap-scalping': vwapScalping,
   'volatility-swing': volatilitySwing,
-  'rsi-ema-volatility': rsiEmaVolatility
+  'rsi-ema-volatility': rsiEmaVolatility,
+  'bullish-candlestick': bullishCandlestick
 }
 
 export function getAvailableStrategies() {

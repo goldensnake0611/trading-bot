@@ -75,8 +75,6 @@ export default function Dashboard() {
   const { logout } = useAuth()
   const [activeTab, setActiveTab] = useState('trading')
   const [marketType, setMarketType] = useState(() => localStorage.getItem('market_type') || 'spot')
-  const [balance, setBalance] = useState('Loading...')
-  const [dailyPnl, setDailyPnl] = useState(0)
   const [status, setStatus] = useState([])
   const [positions, setPositions] = useState([])
   const [selectedPositionIds, setSelectedPositionIds] = useState(new Set())
@@ -154,7 +152,6 @@ export default function Dashboard() {
   }, [systemLogs])
 
   useEffect(() => {
-    checkBalance()
     fetchStrategies()
     const interval = setInterval(() => {
       refreshSystemLogs()
@@ -237,34 +234,12 @@ export default function Dashboard() {
     } catch (e) { console.error(e) }
   }
 
-  async function checkBalance() {
-    setBalance('Checking...')
-    try {
-      const res = await fetch('/api/balance')
-      if (!res.ok) {
-        const err = await res.json()
-        setBalance('Error: ' + (err.msg || err.error || res.statusText))
-        return
-      }
-      const data = await res.json()
-      if (data.length === 0) setBalance('No funds found.')
-      else setBalance(data.map(b => `${b.asset}: ${b.free}`).join(', '))
-    } catch {
-      setBalance('Network Error')
-    }
-  }
-
   async function refreshTrading() {
     try {
       const sRes = await fetch('/api/status')
       setStatus(await sRes.json())
       const pRes = await fetch('/api/positions')
       setPositions(await pRes.json())
-      const stRes = await fetch('/api/stats')
-      if (stRes.ok) {
-        const stats = await stRes.json()
-        setDailyPnl(stats.dailyPnl)
-      }
     } catch(e) {}
   }
 
@@ -673,19 +648,6 @@ export default function Dashboard() {
           </div>
         )}
 
-        <div className="balance-box">
-          <div><strong>Balance:</strong> {balance}</div>
-          <div style={{ marginLeft: '20px', color: dailyPnl >= 0 ? '#4caf50' : '#ff4d4d' }}>
-            <strong>Today's PnL:</strong> {dailyPnl ? dailyPnl.toFixed(4) : '0.0000'} USDT
-          </div>
-          <button 
-            onClick={checkBalance} 
-            style={{background: 'rgba(255,255,255,0.05)', color: '#d46a84', padding: '6px 14px', fontSize: '12px', borderRadius: '100px', margin: 0, boxShadow: 'none', border: '1px solid rgba(212, 106, 132, 0.2)', cursor: 'pointer'}}
-          >
-            Refresh
-          </button>
-        </div>
-
         <div className="tabs">
           <button 
             className={`tab-btn ${activeTab === 'trading' ? 'active' : ''}`}
@@ -851,7 +813,7 @@ export default function Dashboard() {
                   <table>
                     <thead>
                       <tr>
-                        <th style={{ width: '44px' }}></th>
+                        <th style={{ width: '44px', textAlign: 'center' }}>Pick</th>
                         <th>Symbol</th>
                         <th>Price</th>
                         <th style={{ position: 'relative', cursor: 'pointer', minWidth: '80px' }}>
@@ -967,9 +929,11 @@ export default function Dashboard() {
                                 if (e.target.checked) addSelectedScanToken({ symbol: r.symbol, price: r.price, action: r.action })
                                 else removeSelectedScanToken(r.symbol)
                               }}
+                              className="scan-checkbox"
                               style={{
                                 width: '16px',
                                 height: '16px',
+                                padding: 0,
                                 margin: 0,
                                 accentColor: '#d46a84',
                                 cursor: 'pointer'
