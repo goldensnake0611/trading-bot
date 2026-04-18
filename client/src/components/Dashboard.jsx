@@ -5,6 +5,8 @@ import SymbolSearch from './SymbolSearch'
 import Pagination from './Pagination'
 import IndicatorAnalyzer from './IndicatorAnalyzer'
 
+const SELECTED_SCAN_TOKENS_STORAGE_KEY = 'selected_scan_tokens_v1'
+
 function EditPositionModal({ position, onClose, onSave }) {
   const [tp, setTp] = useState(position.tp || '')
   const [sl, setSl] = useState(position.sl || '')
@@ -122,7 +124,17 @@ export default function Dashboard() {
   const [autoRefresh, setAutoRefresh] = useState(false)
   const [scanActionFilter, setScanActionFilter] = useState('All')
   const [showScanActionFilter, setShowScanActionFilter] = useState(false)
-  const [selectedScanTokens, setSelectedScanTokens] = useState([])
+  const [selectedScanTokens, setSelectedScanTokens] = useState(() => {
+    try {
+      const raw = localStorage.getItem(SELECTED_SCAN_TOKENS_STORAGE_KEY)
+      if (!raw) return []
+      const parsed = JSON.parse(raw)
+      if (!Array.isArray(parsed)) return []
+      return parsed.filter(t => t && typeof t.symbol === 'string')
+    } catch {
+      return []
+    }
+  })
 
 
 
@@ -132,6 +144,16 @@ export default function Dashboard() {
       setIsPaperTrading(true)
     }
   }, [marketType])
+
+  useEffect(() => {
+    try {
+      if (!selectedScanTokens.length) {
+        localStorage.removeItem(SELECTED_SCAN_TOKENS_STORAGE_KEY)
+        return
+      }
+      localStorage.setItem(SELECTED_SCAN_TOKENS_STORAGE_KEY, JSON.stringify(selectedScanTokens))
+    } catch {}
+  }, [selectedScanTokens])
 
   useEffect(() => {
     if (systemLogs.length > 0) {
