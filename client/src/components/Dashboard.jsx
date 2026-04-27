@@ -110,6 +110,9 @@ export default function Dashboard() {
   const [showNotification, setShowNotification] = useState(false)
   const [lastLogTime, setLastLogTime] = useState(null)
   const notificationTimer = useRef(null)
+  const [showScanRefreshNotification, setShowScanRefreshNotification] = useState(false)
+  const [scanRefreshMessage, setScanRefreshMessage] = useState('')
+  const scanRefreshNotificationTimer = useRef(null)
 
   const [isScanning, setIsScanning] = useState(false)
   const [scanResults, setScanResults] = useState([])
@@ -152,7 +155,9 @@ export default function Dashboard() {
         return
       }
       localStorage.setItem(SELECTED_SCAN_TOKENS_STORAGE_KEY, JSON.stringify(selectedScanTokens))
-    } catch {}
+    } catch (err) {
+      console.error(err)
+    }
   }, [selectedScanTokens])
 
   useEffect(() => {
@@ -171,7 +176,7 @@ export default function Dashboard() {
         }, 10000)
       }
     }
-  }, [systemLogs])
+  }, [systemLogs, lastLogTime])
 
   useEffect(() => {
     fetchStrategies()
@@ -190,7 +195,6 @@ export default function Dashboard() {
 
   const handleScan = useCallback(async () => {
     setIsScanning(true)
-    setScanResults([])
     setScanPage(1)
     try {
       const res = await fetch('/api/scan', {
@@ -206,7 +210,14 @@ export default function Dashboard() {
         })
       })
       if (res.ok) {
-        setScanResults(await res.json())
+        const data = await res.json()
+        setScanResults(data)
+        setScanRefreshMessage(`Results refreshed (${Array.isArray(data) ? data.length : 0})`)
+        setShowScanRefreshNotification(true)
+        if (scanRefreshNotificationTimer.current) clearTimeout(scanRefreshNotificationTimer.current)
+        scanRefreshNotificationTimer.current = setTimeout(() => {
+          setShowScanRefreshNotification(false)
+        }, 6000)
       } else {
         const err = await res.json()
         alert('Scan failed: ' + err.error)
@@ -217,7 +228,7 @@ export default function Dashboard() {
     } finally {
       setIsScanning(false)
     }
-  }, [scanStrategy, marketType, scanInterval, volatilityThreshold, scanKlineLimit])
+  }, [scanStrategy, marketType, scanInterval, scanRsiInterval, volatilityThreshold, scanKlineLimit])
 
   // Auto Refresh Effect
   useEffect(() => {
@@ -229,6 +240,13 @@ export default function Dashboard() {
     }
     return () => clearInterval(interval)
   }, [activeTab, autoRefresh, handleScan])
+
+  useEffect(() => {
+    return () => {
+      if (scanRefreshNotificationTimer.current) clearTimeout(scanRefreshNotificationTimer.current)
+      if (notificationTimer.current) clearTimeout(notificationTimer.current)
+    }
+  }, [])
 
   useEffect(() => {
     setSelectedScanTokens(prev => prev.map(t => {
@@ -244,7 +262,9 @@ export default function Dashboard() {
       if (res.ok) {
         setSystemLogs(await res.json())
       }
-    } catch(e) {}
+    } catch (err) {
+      console.error(err)
+    }
   }
 
   async function fetchStrategies() {
@@ -262,7 +282,9 @@ export default function Dashboard() {
       setStatus(await sRes.json())
       const pRes = await fetch('/api/positions')
       setPositions(await pRes.json())
-    } catch(e) {}
+    } catch (err) {
+      console.error(err)
+    }
   }
 
   async function refreshHistory() {
@@ -273,7 +295,9 @@ export default function Dashboard() {
       
       const phRes = await fetch('/api/positions_history')
       setPosHistory(await phRes.json())
-    } catch(e) {}
+    } catch (err) {
+      console.error(err)
+    }
   }
 
   async function startBot() {
@@ -345,7 +369,7 @@ export default function Dashboard() {
         const err = await res.json()
         alert('Sell failed: ' + (err.error || 'Unknown error'))
       }
-    } catch (e) {
+    } catch {
       alert('Network error')
     }
   }
@@ -659,6 +683,38 @@ export default function Dashboard() {
                 background: 'none',
                 border: 'none',
                 color: '#ffb3c1',
+                cursor: 'pointer',
+                padding: '4px',
+                display: 'flex',
+                alignItems: 'center'
+              }}
+            >
+              <X size={18} />
+            </button>
+          </div>
+        )}
+
+        {activeTab === 'scanner' && showScanRefreshNotification && (
+          <div style={{ 
+            marginBottom: '20px', 
+            padding: '10px', 
+            background: 'rgba(76, 63, 207, 0.12)', 
+            border: '1px solid rgba(76, 63, 207, 0.35)', 
+            borderRadius: '8px', 
+            color: '#c9c3ff',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <div>
+              <strong>Scan Notification:</strong> {scanRefreshMessage} <small>({new Date().toLocaleTimeString()})</small>
+            </div>
+            <button 
+              onClick={() => setShowScanRefreshNotification(false)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#c9c3ff',
                 cursor: 'pointer',
                 padding: '4px',
                 display: 'flex',

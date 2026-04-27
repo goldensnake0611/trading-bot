@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Brush, ReferenceLine } from 'recharts'
 import SymbolSearch from './SymbolSearch'
 
@@ -38,6 +38,28 @@ function calculateVWAP(klines, period = 20) {
     }
   }
   return vwapArray
+}
+
+function CustomTooltip({ active, payload }) {
+  if (active && payload && payload.length) {
+    const d = payload[0].payload
+    return (
+      <div className="bg-[#0f111a] p-4 border border-gray-700 rounded-lg shadow-2xl text-sm font-mono backdrop-blur-sm bg-opacity-95">
+        <p className="text-gray-400 mb-2 border-b border-gray-700 pb-2">{new Date(d.time).toLocaleString()}</p>
+        <div className="flex items-center gap-6">
+          <p className="text-emerald-400 font-bold">
+            <span>Price: </span>
+            <span>{d.close}</span>
+          </p>
+          <p className="text-orange-400">
+            <span>VWAP: </span>
+            <span>{d.vwap ? d.vwap.toFixed(2) : 'N/A'}</span>
+          </p>
+        </div>
+      </div>
+    )
+  }
+  return null
 }
 
 export default function IndicatorAnalyzer() {
@@ -132,28 +154,6 @@ export default function IndicatorAnalyzer() {
     const timer = setInterval(() => fetchData(true), 30000)
     return () => clearInterval(timer)
   }, [symbol, timeframe, period, useFutures])
-
-  const CustomTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      const d = payload[0].payload
-      return (
-        <div className="bg-[#0f111a] p-4 border border-gray-700 rounded-lg shadow-2xl text-sm font-mono backdrop-blur-sm bg-opacity-95">
-          <p className="text-gray-400 mb-2 border-b border-gray-700 pb-2">{new Date(d.time).toLocaleString()}</p>
-          <div className="flex items-center gap-6">
-            <p className="text-emerald-400 font-bold">
-              <span>Price: </span>
-              <span>{d.close}</span>
-            </p>
-            <p className="text-orange-400">
-              <span>VWAP: </span>
-              <span>{d.vwap ? d.vwap.toFixed(2) : 'N/A'}</span>
-            </p>
-          </div>
-        </div>
-      )
-    }
-    return null
-  }
 
   const currentPrice = data.length > 0 ? data[data.length - 1].price : null
 
