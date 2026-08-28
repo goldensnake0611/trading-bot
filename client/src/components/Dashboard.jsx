@@ -958,7 +958,7 @@ export default function Dashboard() {
                           </td>
                         </tr>
                       )}
-                      {isScanning && (
+                      {isScanning && scanResults.length === 0 && (
                         <tr>
                           <td colSpan="5" style={{ textAlign: 'center', padding: '20px', color: '#d46a84' }}>
                             Scanning market... This may take a moment...
